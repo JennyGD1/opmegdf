@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 3000;
 
 // Configurações
 const GAS_TOKEN_URL = process.env.GAS_TOKEN_URL;
-const BASE_URL = process.env.BASE_URL || "https://regulacao-api.issec.maida.health";
+const BASE_URL = process.env.BASE_URL || "https://df-regulacao-api-live.gdf.live.maida.health";
 
 // Middlewares
 app.use(cors());
