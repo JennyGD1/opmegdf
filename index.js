@@ -22,6 +22,7 @@ app.get('/', (req, res) => {
 
 // Rota da API para buscar guias com progresso
 app.get('/api/guias-opme-progress', async (req, res) => {
+    console.log('📢 ROTA /api/guias-opme-progress ACESSADA');
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -324,7 +325,10 @@ async function buscarGuiasOPME() {
         throw error;
     }
 }
-
+app.get('/api/teste', (req, res) => {
+    console.log('✅ Rota /api/teste funcionando');
+    res.json({ message: 'API funcionando!', timestamp: new Date().toISOString() });
+});
 app.listen(PORT, () => {
     console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
 });
