@@ -7,12 +7,13 @@ const PORT = process.env.PORT || 3000;
 
 // Configurações
 const GAS_TOKEN_URL = process.env.GAS_TOKEN_URL;
-const BASE_URL = process.env.BASE_URL || "https://regulacao-api.issec.maida.health";
+const BASE_URL = process.env.BASE_URL || "https://df-regulacao-api-live.gdf.live.maida.health";
 
 // Middlewares
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/img', express.static(path.join(__dirname, 'public', 'img')));
 
 // Rota para servir a página HTML
 app.get('/', (req, res) => {
