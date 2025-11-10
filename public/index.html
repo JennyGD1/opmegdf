@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Maida Health - Guias OPME</title>
-    <link rel="icon" href="data:,">
     <style>
         :root {
             --maida-branco: #ffffff;
@@ -465,7 +464,7 @@
     <div class="container">
         <div class="header">
             <img src="./img/logo_maida_branca.png" class="maidalogo" id="maidalogo">
-            <h1>Guias OPME(INAS)</h1>
+            <h1>Guias OPME</h1>
         </div>
 
         <div class="controls">
@@ -586,9 +585,9 @@
                 autorizadas: total > 0 ? (resultados.autorizadas.length / total * 100).toFixed(1) : 0,
                 parcialmenteAutorizadas: total > 0 ? (resultados.parcialmenteAutorizadas.length / total * 100).toFixed(1) : 0,
                 negadas: total > 0 ? (resultados.negadas.length / total * 100).toFixed(1) : 0,
-                emAnalise: total > 0 ? (resultados.emAnalise.length / total * 100).toFixed(1) : 0
+                emAnalise: total > 0 ? (resultados.emAnalise.length / total * 100).toFixed(1) : 0,
+                semGuiaOrigem: total > 0 ? (resultados.semGuiaOrigem.length / total * 100).toFixed(1) : 0
             };
-
 
             // Atualizar resumo
             resumoGrid.innerHTML = `
@@ -611,6 +610,11 @@
                     <div class="resumo-numero">${resultados.emAnalise.length}</div>
                     <div>⏳ Em Análise</div>
                     <div class="resumo-porcentagem">${porcentagens.emAnalise}%</div>
+                </div>
+                <div class="resumo-item" style="border-left: 4px solid #6c757d; background: #f8f9fa;">
+                    <div class="resumo-numero">${resultados.semGuiaOrigem.length}</div>
+                    <div>❓ Sem Guia Origem</div>
+                    <div class="resumo-porcentagem">${porcentagens.semGuiaOrigem}%</div>
                 </div>
             `;
             resumo.style.display = 'block';
@@ -638,6 +642,11 @@
                     chave: 'emAnalise', 
                     titulo: '⏳ Guias de OPME com Guia de Origem em Análise',
                     icon: '⏳'
+                },
+                { 
+                    chave: 'semGuiaOrigem', 
+                    titulo: '❓ Guias de OPME sem Guia de Origem',
+                    icon: '❓'
                 }
             ];
 
@@ -673,11 +682,12 @@
                     <div class="empty-state">
                         <div style="font-size: 3rem;">📭</div>
                         <h3>Nenhuma guia encontrada</h3>
-                        <p>Não foram encontradas guias OPME em análise com guias de origem.</p>
+                        <p>Não foram encontradas guias OPME em análise.</p>
                     </div>
                 `;
             }
         }
+
 
         function criarCardGuia(guia, categoria) {
             const card = document.createElement('div');
@@ -685,48 +695,60 @@
             
             const statusClass = getStatusClass(categoria);
 
+            // Verificar se é uma guia sem origem para mostrar informações diferentes
+            const isSemOrigem = categoria === 'semGuiaOrigem';
+            
             card.innerHTML = `
                 <div class="guia-header">
                     <div class="guia-info">
                         <h3>Guia de OPME - Nº ${guia.guiaOPME}</h3>
                         <div class="guia-detalhes">
-                            Guia de Origem: ${guia.tipoGuiaOrigem} - Nº ${guia.guiaOrigem}
+                            ${isSemOrigem ? 
+                                `Tipo: ${guia.tipoGuiaOrigem}` : 
+                                `Guia de Origem: ${guia.tipoGuiaOrigem} - Nº ${guia.guiaOrigem}`
+                            }
                         </div>
-                        <div class="guia-status ${statusClass}">
-                            Status Guia de Origem: ${guia.statusOrigem}
-                        </div>
-                    </div>
-                    <button class="expand-btn">▼</button>
-                </div>
-                <div class="itens-container">
-                    ${guia.itensOrigem.length > 0 ? 
-                        '<div style="margin-bottom: 1rem; font-weight: bold;">Itens da Guia Origem:</div>' +
-                        guia.itensOrigem.map(item => `
-                            <div class="item-lista">
-                                <div class="item-codigo">${item.codigo}</div>
-                                <div class="item-descricao">${item.descricao}</div>
-                                <div class="item-quantidades">
-                                    <span class="quant-solicitada">Qtd Solicitada: ${item.quantSolicitada}</span> - 
-                                    <span class="quant-autorizada">Qtd Autorizada: ${item.quantAutorizada}</span>
-                                </div>
+                        ${!isSemOrigem ? `
+                            <div class="guia-status ${statusClass}">
+                                Status Guia de Origem: ${guia.statusOrigem}
                             </div>
-                        `).join('') 
-                        : 
-                        '<div class="item-lista">Nenhum item encontrado</div>'
-                    }
+                        ` : ''}
+                    </div>
+                    ${!isSemOrigem && guia.itensOrigem.length > 0 ? '<button class="expand-btn">▼</button>' : ''}
                 </div>
+                ${!isSemOrigem ? `
+                    <div class="itens-container">
+                        ${guia.itensOrigem.length > 0 ? 
+                            '<div style="margin-bottom: 1rem; font-weight: bold;">Itens da Guia Origem:</div>' +
+                            guia.itensOrigem.map(item => `
+                                <div class="item-lista">
+                                    <div class="item-codigo">${item.codigo}</div>
+                                    <div class="item-descricao">${item.descricao}</div>
+                                    <div class="item-quantidades">
+                                        <span class="quant-solicitada">Qtd Solicitada: ${item.quantSolicitada}</span> - 
+                                        <span class="quant-autorizada">Qtd Autorizada: ${item.quantAutorizada}</span>
+                                    </div>
+                                </div>
+                            `).join('') 
+                            : 
+                            '<div class="item-lista">Nenhum item encontrado</div>'
+                        }
+                    </div>
+                ` : ''}
             `;
 
-            // Adicionar evento de clique para expandir
-            const header = card.querySelector('.guia-header');
-            const expandBtn = card.querySelector('.expand-btn');
-            const itensContainer = card.querySelector('.itens-container');
+            // Adicionar evento de clique para expandir apenas se não for sem origem e tiver itens
+            if (!isSemOrigem && guia.itensOrigem.length > 0) {
+                const header = card.querySelector('.guia-header');
+                const expandBtn = card.querySelector('.expand-btn');
+                const itensContainer = card.querySelector('.itens-container');
 
-            header.addEventListener('click', () => {
-                const isExpanded = itensContainer.classList.contains('show');
-                itensContainer.classList.toggle('show', !isExpanded);
-                expandBtn.classList.toggle('expanded', !isExpanded);
-            });
+                header.addEventListener('click', () => {
+                    const isExpanded = itensContainer.classList.contains('show');
+                    itensContainer.classList.toggle('show', !isExpanded);
+                    expandBtn.classList.toggle('expanded', !isExpanded);
+                });
+            }
 
             return card;
         }
@@ -737,6 +759,7 @@
                 case 'parcialmenteAutorizadas': return 'status-parcial';
                 case 'negadas': return 'status-negada';
                 case 'emAnalise': return 'status-analise';
+                case 'semGuiaOrigem': return 'status-analise';
                 default: return 'status-analise';
             }
         }
