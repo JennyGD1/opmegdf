@@ -448,21 +448,20 @@
                 <div class="guia-header">
                     <div class="guia-info">
                         <h3>Guia de OPME - Nº ${guia.guiaOPME}</h3>
+                        
                         <div class="guia-detalhes">
                             ${isSemOrigem ? 
+                                // Se não tiver origem, exibe o tipo e status OPME
                                 `**Tipo:** ${guia.tipoGuiaOrigem} (Status OPME: ${guia.statusOPME})` : 
+                                
+                                // LINHA 2: DETALHE DA GUIA DE ORIGEM
+                                // A Guia Origem também deve exibir o número de autorização (guia.guiaOrigem)
                                 `**Guia Origem:** ${guia.tipoGuiaOrigem} - Nº ${guia.guiaOrigem} (Status OPME: ${guia.statusOPME})`
                             }
                         </div>
-                        ${!isSemOrigem ? `
-                            <div class="guia-status ${statusClass} mt-2">
-                                Status Guia de Origem: **${guia.statusOrigem}**
-                            </div>
-                        ` : ''}
-                        <div class="guia-detalhes mt-1">**Beneficiário:** ${guia.beneficiario} - **Prestador:** ${guia.prestador}</div>
+                        
+                        </div>
                     </div>
-                    ${!isSemOrigem && guia.itensOrigem.length > 0 ? '<button class="expand-btn">▼</button>' : ''}
-                </div>
             `;
             
             card.innerHTML = headerHTML;
