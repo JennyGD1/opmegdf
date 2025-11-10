@@ -5,7 +5,7 @@ const cors = require('cors');
 const fetch = require('node-fetch');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Configurações de API
 const API_BASE_URL = 'https://df-regulacao-api-live.gdf.live.maida.health/v2/buscar-guia/detalhamento-guia/';
