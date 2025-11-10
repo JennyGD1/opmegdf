@@ -204,13 +204,14 @@ app.get('/api/guias-opme-progress', async (req, res) => {
             const percent = percentBase + ((i + 1) / total * 70);
             
             let resultado = {
-                guiaOPME: guiaOPME.idGuia,
+                guiaOPME: guiaOPME.autorizacaoGuia, 
+                idGuiaOPME: guiaOPME.idGuia,       
                 beneficiario: guiaOPME.beneficiario,
                 prestador: guiaOPME.prestador,
                 statusOPME: formatarStatus(guiaOPME.statusRegulacao),
-                guiaOrigem: 'N/A',
+                guiaOrigem: 'N/A', // Será atualizado com o número de autorização da Guia de Origem
                 tipoGuiaOrigem: formatarTipoGuia(guiaOPME.tipoDeGuia),
-                statusOrigem: formatarStatus(guiaOPME.statusRegulacao), // Inicializa com status OPME
+                statusOrigem: formatarStatus(guiaOPME.statusRegulacao),
                 itensOrigem: []
             };
 
