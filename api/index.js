@@ -6,14 +6,13 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Configurações
-const GAS_TOKEN_URL = process.env.GAS_TOKEN_URL;
-const BASE_URL = process.env.BASE_URL || "https://df-regulacao-api-live.gdf.live.maida.health";
+const GAS_TOKEN_URL = "https://script.google.com/macros/s/AKfycbypQ1Smx0v-2w4brX8FV3D52op3RvKsfzyxoHNq05Fm5AdGDAHaYqvhN7lQ2VY4Ir-H/exec";
+const BASE_URL = "https://df-regulacao-api-live.gdf.live.maida.health";
 
 // Middlewares
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '..', 'public')));
-app.use('/img', express.static(path.join(__dirname, '..', 'public', 'img')));
+app.use(express.static('public'));
 
 // Rota para servir a página HTML
 app.get('/', (req, res) => {
@@ -179,17 +178,16 @@ async function obterToken() {
         return null;
     }
 }
-
-// Função para buscar todas as guias OPME (com paginação)
 async function buscarTodasGuiasOPME(token) {
     let todasGuias = [];
     let page = 0;
-    let hasMore = true;
+    let totalPages = null;
 
-    while (hasMore) {
-        const url = `${BASE_URL}/v3/historico-cliente?ordenarPor=DATA_SOLICITACAO&tipoDeGuia=SOLICITACAO_DE_OPME&page=${page}&listaDeStatus=EM_ANALISE`;
+    while (true) {
+        const url = `${BASE_URL}/v3/historico-cliente?tipoDeGuia=SOLICITACAO_DE_OPME&page=${page}&ordenarPor=SLA&listaDeStatus=EM_ANALISE`;
         
         try {
+            console.log(`Buscando página ${page}...`);
             const response = await fetch(url, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -198,34 +196,59 @@ async function buscarTodasGuiasOPME(token) {
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                console.log(`Erro HTTP ${response.status} na página ${page}`);
+                break;
             }
 
             const data = await response.json();
             
-            if (data.content && data.content.length > 0) {
-                todasGuias = todasGuias.concat(data.content);
-                console.log(`Página ${page}: ${data.content.length} guias encontradas`);
-                
-                // Verificar se há mais páginas
-                if (data.last === true || data.content.length < data.size) {
-                    hasMore = false;
-                } else {
-                    page++;
-                }
-            } else {
-                hasMore = false;
+            console.log(`Resposta da página ${page}:`, {
+                contentLength: data.content?.length,
+                totalElements: data.totalElements,
+                totalPages: data.totalPages,
+                last: data.last,
+                first: data.first,
+                number: data.number,
+                size: data.size
+            });
+
+            if (!data.content || data.content.length === 0) {
+                console.log(`Página ${page} vazia - fim da paginação`);
+                break;
             }
+
+            todasGuias = todasGuias.concat(data.content);
+            console.log(`Página ${page}: ${data.content.length} guias encontradas`);
+
+            // Guardar totalPages da primeira resposta
+            if (totalPages === null && data.totalPages) {
+                totalPages = data.totalPages;
+                console.log(`Total de páginas a serem buscadas: ${totalPages}`);
+            }
+
+            // Verificar se é a última página
+            if (data.last === true) {
+                console.log(`Última página alcançada: ${page}`);
+                break;
+            }
+
+            // Verificar baseado no totalPages
+            if (totalPages && page >= totalPages - 1) {
+                console.log(`Todas as ${totalPages} páginas foram buscadas`);
+                break;
+            }
+
+            page++;
 
         } catch (error) {
             console.error(`Erro ao buscar página ${page}:`, error);
-            hasMore = false;
+            break;
         }
     }
 
+    console.log(`Busca concluída: ${todasGuias.length} guias encontradas em ${page + 1} páginas`);
     return todasGuias;
 }
-
 // Função para buscar detalhes de uma guia específica
 async function buscarDetalhesGuia(idGuia, token) {
     const url = `${BASE_URL}/v2/buscar-guia/detalhamento-guia/${idGuia}`;
