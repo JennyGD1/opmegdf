@@ -2,34 +2,23 @@
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
-const fetch = require('node-fetch'); // Usando node-fetch para compatibilidade com Node.js
+const fetch = require('node-fetch');
 
 const app = express();
 const PORT = 3000;
 
 // Configurações de API
 const API_BASE_URL = 'https://df-regulacao-api-live.gdf.live.maida.health/v2/buscar-guia/detalhamento-guia/';
-const API_LISTA_BASE = 'https://df-regulacao-api-live.gdf.live.maida.health/v2/cotacao-opme/em-analise';
-
-// Seu GAS Token URL
+const API_LISTA_BASE = 'https://df-regulacao-api-live.gdf.live.maida.health/v2/cotacao-opme/em-analise'; // API 1 URL
 const GAS_TOKEN_URL = process.env.GAS_TOKEN_URL;
 
 // Middlewares
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public'))); // Servir arquivos estáticos da pasta 'public'
-
-// Rota para servir a página HTML (ajustada para servir o index.html na pasta public)
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Funções de Utilitário e API
 
-/**
- * Obtém o token do Google Apps Script.
- * @returns {Promise<string|null>} O token de acesso ou null.
- */
 async function obterToken() {
     try {
         const response = await fetch(GAS_TOKEN_URL);
@@ -43,29 +32,24 @@ async function obterToken() {
 }
 
 /**
- * Busca todas as guias OPME em "em-analise" (API 1).
+ * Busca todas as guias OPME em "em-analise" (API 1) com paginação.
  */
 async function buscarGuiasOPME(token) {
     let todasGuias = [];
     let page = 0;
     let hasMore = true;
-
-    // A API só retorna as guias em análise/reavaliação/documentação pendente
-    const initialSize = 10; 
+    const pageSize = 10; 
 
     while (hasMore) {
-        const url = `${API_LISTA_BASE}?page=${page}&size=${initialSize}`;
+        const url = `${API_LISTA_BASE}?page=${page}&size=${pageSize}`;
         
         try {
-            const response = await fetch(url, {
-                headers: { 
-                    'Authorization': `Bearer ${token}` 
-                }
-            });
+            const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
 
             if (!response.ok) {
                 // Se a API retornar 400 ou outro erro, paramos a busca.
-                throw new Error(`Falha na API de lista inicial. Status: ${response.status}`);
+                const errorBody = await response.text();
+                throw new Error(`Falha na API de lista inicial. Status: ${response.status}. Detalhes: ${errorBody.substring(0, 100)}`);
             }
 
             const data = await response.json();
@@ -73,8 +57,7 @@ async function buscarGuiasOPME(token) {
             if (data.content && data.content.length > 0) {
                 todasGuias = todasGuias.concat(data.content);
                 
-                // Verifica se é a última página (melhor prática para paginação)
-                if (data.last === true || data.content.length < data.size) {
+                if (data.last === true || data.content.length < pageSize) {
                     hasMore = false;
                 } else {
                     page++;
@@ -84,7 +67,7 @@ async function buscarGuiasOPME(token) {
             }
 
         } catch (error) {
-            console.error(`Erro ao buscar página ${page}:`, error);
+            console.error(`Erro ao buscar página ${page}:`, error.message);
             hasMore = false;
         }
     }
@@ -92,21 +75,40 @@ async function buscarGuiasOPME(token) {
     return todasGuias;
 }
 
-
-// Função para buscar detalhes de uma guia específica (API 2 e 3)
+/**
+ * Busca detalhes de uma guia específica (API 2 e 3) com tratamento de JSON inválido.
+ */
 async function buscarDetalhesGuia(idGuia, token, tipoSegmento = '') {
     const url = `${API_BASE_URL}${idGuia}${tipoSegmento ? '/' + tipoSegmento : ''}`;
     
     try {
-        const response = await fetch(url, {
+        const options = {
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-        });
+        };
+
+        const response = await fetch(url, options);
 
         if (!response.ok) {
             console.warn(`API Detalhe (ID: ${idGuia}) falhou com status: ${response.status}`);
             return null;
         }
-        return await response.json();
+        
+        // Tenta ler o corpo como texto primeiro para manipulação segura de JSON inválido
+        const text = await response.text();
+        
+        if (!text || text.trim().length === 0) {
+            console.warn(`API Detalhe (ID: ${idGuia}) retornou corpo vazio.`);
+            return null;
+        }
+        
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            // Captura o erro 'Unexpected end of JSON input'
+            console.error(`Falha ao parsear JSON para ID ${idGuia}. Resposta recebida (início): ${text.substring(0, 100)}...`);
+            return null;
+        }
+        
     } catch (error) {
         console.error(`Erro na requisição da API Detalhe para ${idGuia}:`, error.message);
         return null;
@@ -118,7 +120,8 @@ function formatarStatus(status) {
     if (!status) return 'S/ Status';
     switch (status.toUpperCase()) {
         case 'AUTORIZADA': return 'Autorizada';
-        case 'AUTORIZADA_PARCIALMENTE': return 'Parcialmente Autorizada';
+        case 'EXECUTADA': return 'Executada'; // Novo status
+        case 'AUTORIZADA_PARCIALMENTE': return 'Autorizada Parcialmente'; 
         case 'NEGADA': case 'NEGADA_PARCIALMENTE': return 'Negada';
         case 'EM_ANALISE': case 'EM_REANALISE': case 'DOCUMENTACAO_EM_ANALISE': case 'AGUARDANDO_NO_PRAZO': case 'PENDENTE': return 'Em Análise';
         default: return status.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
@@ -140,10 +143,19 @@ function getStatusKey(statusOrigem, idGuiaOrigem) {
     }
     
     switch (statusOrigem) {
-        case 'Autorizada': return 'autorizadas';
-        case 'Parcialmente Autorizada': return 'parcialmenteAutorizadas';
-        case 'Negada': return 'negadas';
-        default: return 'emAnalise';
+        case 'Autorizada': 
+        case 'Executada': // Mapeia 'Executada' para Autorizada
+            return 'autorizadas';
+        case 'Autorizada Parcialmente':
+            return 'parcialmenteAutorizadas';
+        case 'Negada':
+            return 'negadas';
+        case 'Em Análise':
+        case 'Em Reanalise':
+        case 'Documentacao Em Analise':
+            return 'emAnalise';
+        default:
+            return 'semGuiaOrigem'; 
     }
 }
 
@@ -193,7 +205,7 @@ app.get('/api/guias-opme-progress', async (req, res) => {
                 statusOPME: formatarStatus(guiaOPME.statusRegulacao),
                 guiaOrigem: 'N/A',
                 tipoGuiaOrigem: formatarTipoGuia(guiaOPME.tipoDeGuia),
-                statusOrigem: 'NÃO ENCONTRADA',
+                statusOrigem: formatarStatus(guiaOPME.statusRegulacao), // Inicializa com status OPME
                 itensOrigem: []
             };
 
@@ -228,8 +240,13 @@ app.get('/api/guias-opme-progress', async (req, res) => {
                             }));
                         }
                     } else {
-                        resultado.statusOrigem = 'ERRO AO BUSCAR DETALHE';
+                        resultado.statusOrigem = 'ERRO AO BUSCAR DETALHE (API 3)';
                     }
+                } else if (detalhesOPME?.guia?.guiaOrigem === undefined) {
+                    // Guia OPME sem guia de origem relacionada
+                    resultado.statusOrigem = formatarStatus(guiaOPME.statusRegulacao);
+                } else {
+                    resultado.statusOrigem = 'Guia Origem não relacionada/encontrada';
                 }
             } catch (error) {
                 resultado.statusOrigem = `ERRO: ${error.message.substring(0, 50)}...`;
@@ -259,11 +276,6 @@ app.get('/api/guias-opme-progress', async (req, res) => {
     }
 });
 
-
-// Health check
-app.get('/health', (req, res) => {
-    res.json({ status: 'OK', timestamp: new Date().toISOString() });
-});
 
 app.listen(PORT, () => {
     console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
