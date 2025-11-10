@@ -20,8 +20,47 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--cinza-claro-fundo); color: var(--maida-cinza-escuro); line-height: 1.6; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; padding: 0; }
-        .header { background: var(--maida-azul); color: var(--maida-branco); padding: 1.5rem 2rem; border-radius: 15px; margin-bottom: 2rem; box-shadow: 0 4px 15px rgba(0, 112, 255, 0.2); text-align: center; }
-        .header h1 { font-size: 1.5rem; font-weight: 700; margin: 0; }
+        .header-container {
+            display: flex;
+            align-items: center;
+            /* Remove justify-content para que o item do meio possa centralizar */
+            /* justify-content: space-between; /* <- NÃO USAR ESTE SE QUISER CENTRALIZAR UM ITEM ESPECÍFICO */ 
+            padding: 0 20px;
+            max-width: 1200px;
+            margin: 0 auto; /* Centraliza o próprio container dentro do header */
+            position: relative; /* Necessário para posicionamento absoluto, se for o caso, ou para o flex-grow */
+            min-height: 80px; /* Garante uma altura mínima para o header */
+        }
+        .header-title-wrapper {
+            flex-grow: 1; /* Faz com que este elemento ocupe todo o espaço disponível */
+            text-align: center; /* Centraliza o texto dentro DELE */
+            /* Ajuste para compensar a largura da logo se o texto for muito curto e não preencher a largura total */
+            /* Exemplo: margin-left: -70px; para mover o centro para a esquerda se a logo for 120px e você quer o centro real */
+            /* No entanto, para títulos grandes, flex-grow e text-align: center costumam ser suficientes. */
+        }
+
+        .maidalogo {
+            height: 60px; /* Ajuste a altura conforme necessário */
+            width: auto;
+            /* Adiciona uma margem à direita da logo para dar espaço ao texto */
+            margin-right: 20px; 
+        }
+
+        .header {
+            background: var(--maida-azul);
+            color: var(--maida-branco);
+            padding: 1.5rem 0; /* Ajuste o padding vertical, padding horizontal será pelo header-container */
+            border-radius: 15px;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 15px rgba(0, 112, 255, 0.2);
+            text-align: left; /* Mantém alinhamento padrão ou pode ser removido, pois o flexbox irá gerenciar */
+        }
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 0;
+            /* O text-align agora é controlado pelo .header-title-wrapper */
+        }
         .controls { background: var(--maida-branco); padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); text-align: center; }
         .btn-buscar { background: var(--maida-azul); color: var(--maida-branco); border: none; padding: 12px 30px; font-size: 1.1rem; border-radius: 25px; cursor: pointer; transition: all 0.3s ease; font-weight: 600; box-shadow: 0 4px 15px rgba(0, 112, 255, 0.3); }
         .btn-buscar:hover:not(:disabled) { background: var(--maida-rosa); box-shadow: 0 6px 20px rgba(255, 0, 115, 0.4); }
@@ -96,7 +135,13 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>OPME (INAS)</h1>
+            <div class="header-container">
+                <img src="./img/logo_maida_branca.png" class="maidalogo"> 
+                
+                <div class="header-title-wrapper">
+                    <h1>OPME (INAS)</h1>
+                </div>
+            </div>
         </div>
 
         <div class="controls">
@@ -104,7 +149,6 @@
                 Buscar Guias de Origem
             </button>
         </div>
-
         <div class="loading" id="loading">
             <div class="spinner"></div>
             <div class="progress-container">
@@ -200,89 +244,173 @@
             progressText.textContent = Math.round(percent) + '%';
             progressDetails.textContent = message;
         }
+        function getStatusPriority(status) {
+            // Normaliza status para comparação
+            const normalizedStatus = status.toUpperCase();
 
+            // 1. Autorizadas | Executadas
+            if (normalizedStatus === 'AUTORIZADA' || normalizedStatus === 'EXECUTADA') return 1;
+
+            // 2. Executadas Parcialmente
+            if (normalizedStatus === 'EXECUTADA PARCIALMENTE') return 2;
+
+            // 3. Autorizadas Parcialmente
+            if (normalizedStatus === 'AUTORIZADA PARCIALMENTE') return 3;
+
+            // 4. Negadas
+            if (normalizedStatus === 'NEGADA') return 4;
+            
+            // 5. Em Análise
+            if (normalizedStatus.includes('ANALISE') || normalizedStatus.includes('PENDENTE')) return 5;
+
+            // 6. Sem Guia de Origem / Erros / Outros
+            return 6;
+        }
+        function sortResults(a, b) {
+            const priorityA = getStatusPriority(a.statusOrigem);
+            const priorityB = getStatusPriority(b.statusOrigem);
+            
+            if (priorityA !== priorityB) {
+                return priorityA - priorityB; // Ordena pela prioridade
+            }
+            
+            // Se a prioridade for a mesma, ordena por ID da Guia OPME para consistência
+            return a.guiaOPME - b.guiaOPME;
+        }
         function exibirResultados(resultados) {
             const resumo = document.getElementById('resumo');
             const resumoGrid = document.getElementById('resumoGrid');
             const guiasContainer = document.getElementById('guiasContainer');
 
-            const total = Object.values(resultados).reduce((sum, arr) => sum + arr.length, 0);
+            // Combina todas as guias em uma única lista
+            const allGuides = [
+                ...resultados.autorizadas,
+                ...resultados.parcialmenteAutorizadas,
+                ...resultados.negadas,
+                ...resultados.emAnalise,
+                ...resultados.semGuiaOrigem
+            ];
+
+            const total = allGuides.length;
             
             if (total === 0) {
-                 guiasContainer.innerHTML = `<div class="empty-state">... Nenhuma guia encontrada ...</div>`;
-                 return;
+                guiasContainer.innerHTML = `<div class="empty-state">... Nenhuma guia encontrada ...</div>`;
+                return;
             }
 
             const getPercentage = (count) => total > 0 ? (count / total * 100).toFixed(1) : 0;
 
-            const porcentagens = {
-                autorizadas: getPercentage(resultados.autorizadas.length),
-                parcialmenteAutorizadas: getPercentage(resultados.parcialmenteAutorizadas.length),
-                negadas: getPercentage(resultados.negadas.length),
-                emAnalise: getPercentage(resultados.emAnalise.length),
-                semGuiaOrigem: getPercentage(resultados.semGuiaOrigem.length)
-            };
+            // --- Mapeamento das categorias para exibição na ORDEM CORRETA ---
+            // Agrupamos os dados brutos nas categorias desejadas para exibição.
+            const categoriasOrdenadas = [
+                { 
+                    chave: 'autorizadas', 
+                    titulo: '✅ Autorizadas / Executadas', 
+                    icon: '✅', 
+                    data: allGuides.filter(g => getStatusPriority(g.statusOrigem) === 1) 
+                },
+                { 
+                    chave: 'parcialmenteExecutada', 
+                    titulo: '🔶 Executadas Parcialmente', 
+                    icon: '🔶', 
+                    data: allGuides.filter(g => getStatusPriority(g.statusOrigem) === 2) 
+                },
+                { 
+                    chave: 'parcialmenteAutorizadas', 
+                    titulo: '⚠️ Autorizadas Parcialmente', 
+                    icon: '⚠️', 
+                    data: allGuides.filter(g => getStatusPriority(g.statusOrigem) === 3) 
+                },
+                { 
+                    chave: 'negadas', 
+                    titulo: '❌ Negadas', 
+                    icon: '❌', 
+                    data: allGuides.filter(g => getStatusPriority(g.statusOrigem) === 4) 
+                },
+                { 
+                    chave: 'emAnalise', 
+                    titulo: '⏳ Em Análise', 
+                    icon: '⏳', 
+                    data: allGuides.filter(g => getStatusPriority(g.statusOrigem) === 5) 
+                },
+                { 
+                    chave: 'semGuiaOrigem', 
+                    titulo: '❓ Sem Guia Origem / Erro', 
+                    icon: '❓', 
+                    data: allGuides.filter(g => getStatusPriority(g.statusOrigem) === 6) 
+                }
+            ];
+            
+            // Calcula o total de cada grupo para o resumo
+            const resumoData = categoriasOrdenadas.reduce((acc, cat) => {
+                acc[cat.chave] = {
+                    length: cat.data.length,
+                    percentage: getPercentage(cat.data.length),
+                    title: cat.titulo,
+                    icon: cat.icon
+                };
+                return acc;
+            }, {});
 
+
+            // --- 1. Atualiza Resumo ---
             resumoGrid.innerHTML = `
                 <div class="resumo-item autorizadas">
-                    <div class="resumo-numero">${resultados.autorizadas.length}</div>
-                    <div>✅ Autorizadas / Executadas</div>
-                    <div class="resumo-porcentagem">${porcentagens.autorizadas}%</div>
+                    <div class="resumo-numero">${resumoData.autorizadas.length}</div>
+                    <div>${resumoData.autorizadas.icon} Autorizadas / Executadas</div>
+                    <div class="resumo-porcentagem">${resumoData.autorizadas.percentage}%</div>
                 </div>
                 <div class="resumo-item parciais">
-                    <div class="resumo-numero">${resultados.parcialmenteAutorizadas.length}</div>
-                    <div>⚠️ Autorizadas Parcialmente</div>
-                    <div class="resumo-porcentagem">${porcentagens.parcialmenteAutorizadas}%</div>
+                    <div class="resumo-numero">${resumoData.parcialmenteExecutada.length}</div>
+                    <div>${resumoData.parcialmenteExecutada.icon} Executadas Parcialmente</div>
+                    <div class="resumo-porcentagem">${resumoData.parcialmenteExecutada.percentage}%</div>
+                </div>
+                <div class="resumo-item parciais">
+                    <div class="resumo-numero">${resumoData.parcialmenteAutorizadas.length}</div>
+                    <div>${resumoData.parcialmenteAutorizadas.icon} Autorizadas Parcialmente</div>
+                    <div class="resumo-porcentagem">${resumoData.parcialmenteAutorizadas.percentage}%</div>
                 </div>
                 <div class="resumo-item negadas">
-                    <div class="resumo-numero">${resultados.negadas.length}</div>
-                    <div>❌ Negadas</div>
-                    <div class="resumo-porcentagem">${porcentagens.negadas}%</div>
+                    <div class="resumo-numero">${resumoData.negadas.length}</div>
+                    <div>${resumoData.negadas.icon} Negadas</div>
+                    <div class="resumo-porcentagem">${resumoData.negadas.percentage}%</div>
                 </div>
                 <div class="resumo-item analise">
-                    <div class="resumo-numero">${resultados.emAnalise.length}</div>
-                    <div>⏳ Em Análise</div>
-                    <div class="resumo-porcentagem">${porcentagens.emAnalise}%</div>
+                    <div class="resumo-numero">${resumoData.emAnalise.length}</div>
+                    <div>${resumoData.emAnalise.icon} Em Análise</div>
+                    <div class="resumo-porcentagem">${resumoData.emAnalise.percentage}%</div>
                 </div>
                 <div class="resumo-item semGuiaOrigem">
-                    <div class="resumo-numero">${resultados.semGuiaOrigem.length}</div>
-                    <div>❓ Sem Guia Origem</div>
-                    <div class="resumo-porcentagem">${porcentagens.semGuiaOrigem}%</div>
+                    <div class="resumo-numero">${resumoData.semGuiaOrigem.length}</div>
+                    <div>${resumoData.semGuiaOrigem.icon} Sem Guia Origem</div>
+                    <div class="resumo-porcentagem">${resumoData.semGuiaOrigem.percentage}%</div>
                 </div>
             `;
             resumo.style.display = 'block';
 
+            // --- 2. Renderiza as Guias na Ordem Correta ---
             guiasContainer.innerHTML = '';
 
-            const categorias = [
-                { chave: 'parcialmenteAutorizadas', titulo: '⚠️ Guias de OPME c/ Origem Autorizada Parcialmente', icon: '⚠️' },
-                { chave: 'negadas', titulo: '❌ Guias de OPME c/ Origem Negada', icon: '❌' },
-                { chave: 'autorizadas', titulo: '✅ Guias de OPME c/ Origem Autorizada/Executada', icon: '✅' },
-                { chave: 'emAnalise', titulo: '⏳ Guias de OPME c/ Origem Em Análise', icon: '⏳' },
-                { chave: 'semGuiaOrigem', titulo: '❓ Guias de OPME Sem Guia de Origem / Erro', icon: '❓' }
-            ];
-
-            categorias.forEach(categoria => {
-                if (resultados[categoria.chave].length > 0) {
+            categoriasOrdenadas.forEach(categoria => {
+                if (categoria.data.length > 0) {
                     const categoriaDiv = document.createElement('div');
                     categoriaDiv.className = `categoria categoria-${categoria.chave}`;
                     
-                    const porcentagemCategoria = getPercentage(resultados[categoria.chave].length);
+                    const porcentagemCategoria = getPercentage(categoria.data.length);
 
                     categoriaDiv.innerHTML = `
                         <div class="categoria-titulo">
                             <span>${categoria.icon} ${categoria.titulo}</span>
                             <span class="categoria-stats">
-                                ${resultados[categoria.chave].length} guias (${porcentagemCategoria}%)
+                                ${categoria.data.length} guias (${porcentagemCategoria}%)
                             </span>
                         </div>
                     `;
 
-                    resultados[categoria.chave].forEach(guia => {
-                        // Não precisamos dessas linhas, pois 'guia' já contém os dados.
-                        // const guia.statusOPME = guia.statusOPME; 
-                        // const guia.statusOrigem = guia.statusOrigem; 
+                    // Ordena internamente por ID Guia OPME para estabilidade visual
+                    categoria.data.sort((a, b) => a.guiaOPME - b.guiaOPME);
 
+                    categoria.data.forEach(guia => {
                         const guiaCard = criarCardGuia(guia, categoria.chave);
                         categoriaDiv.appendChild(guiaCard);
                     });
