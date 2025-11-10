@@ -6,9 +6,13 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Configurações
-const GAS_TOKEN_URL = process.env.GAS_TOKEN_URL;
+const GAS_TOKEN_URL = "https://script.google.com/macros/s/AKfycbypQ1Smx0v-2w4brX8FV3D52op3RvKsfzyxoHNq05Fm5AdGDAHaYqvhN7lQ2VY4Ir-H/exec";
 const BASE_URL = "https://df-regulacao-api-live.gdf.live.maida.health";
 const EVENTOS_GUIA_URL = "https://df-eventos-guia-api-live.gdf.live.maida.health";
+
+// Timeouts para evitar problemas no Vercel
+const REQUEST_TIMEOUT = 10000; // 10 segundos
+const BATCH_DELAY = 200; // Delay entre requisições
 
 // Middlewares
 app.use(cors());
@@ -22,82 +26,111 @@ app.get('/', (req, res) => {
 
 // Rota da API para buscar guias com progresso
 app.get('/api/guias-opme-progress', async (req, res) => {
+    // Configurar headers para SSE
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Content-Encoding', 'none');
     
+    // Manter a conexão viva
+    res.flushHeaders();
+    
+    // Função para enviar mensagens com tratamento de erro
+    const sendMessage = (data) => {
+        try {
+            res.write(`data: ${JSON.stringify(data)}\n\n`);
+            // Forçar flush no Vercel
+            if (res.flush) res.flush();
+        } catch (error) {
+            console.log('Cliente desconectado');
+        }
+    };
+
     try {
         console.log('Cliente conectado ao SSE para busca de guias OPME');
         
         // Enviar progresso inicial
-        res.write(`data: ${JSON.stringify({
+        sendMessage({
             type: 'progress',
             percent: 5,
             message: 'Obtendo token de autenticação...'
-        })}\n\n`);
+        });
 
         const token = await obterToken();
         if (!token) {
-            res.write(`data: ${JSON.stringify({
+            sendMessage({
                 type: 'error',
                 message: 'Não foi possível obter o token de autenticação'
-            })}\n\n`);
+            });
             res.end();
             return;
         }
 
-        res.write(`data: ${JSON.stringify({
+        sendMessage({
             type: 'progress',
             percent: 15,
             message: 'Buscando guias OPME em análise...'
-        })}\n\n`);
+        });
 
         const guiasOPME = await buscarTodasGuiasOPME(token);
         const total = guiasOPME.length;
         
-        res.write(`data: ${JSON.stringify({
+        sendMessage({
             type: 'progress',
             percent: 25,
             message: `Encontradas ${total} guias OPME para processar`
-        })}\n\n`);
+        });
 
         const resultados = {
             autorizadas: [],
             parcialmenteAutorizadas: [],
             negadas: [],
             emAnalise: [],
-            semGuiaOrigem: [] // Nova categoria para OPME sem guia de origem
+            semGuiaOrigem: [],
+            comErro: [] // Nova categoria para guias com erro
         };
 
         for (let i = 0; i < guiasOPME.length; i++) {
             const guiaOPME = guiasOPME[i];
             const percent = 25 + ((i + 1) / guiasOPME.length * 70);
             
-            res.write(`data: ${JSON.stringify({
+            sendMessage({
                 type: 'progress',
                 percent: Math.round(percent),
                 message: `Processando guia ${i + 1} de ${total}: ${guiaOPME.idGuia}`
-            })}\n\n`);
+            });
 
             try {
                 console.log(`Processando guia OPME: ${guiaOPME.idGuia}`);
                 
-                // Buscar detalhes da guia OPME
+                // Buscar detalhes da guia OPME com timeout
                 const detalhesOPME = await buscarDetalhesGuiaOPME(guiaOPME.idGuia, token);
                 
-                if (!detalhesOPME?.guia?.guiaOrigem) {
-                    console.log(`  ⚠️  Sem guia de origem - adicionando à lista de sem guia origem`);
+                if (!detalhesOPME) {
+                    console.log(`  ⚠️  Erro ao buscar detalhes da guia OPME ${guiaOPME.idGuia}`);
                     
-                    const resultadoSemOrigem = {
+                    resultados.comErro.push({
+                        guiaOPME: guiaOPME.idGuia,
+                        guiaOrigem: "N/A",
+                        tipoGuiaOrigem: "Erro ao buscar detalhes",
+                        statusOrigem: "N/A",
+                        itensOrigem: [],
+                        erro: "Falha na requisição de detalhes"
+                    });
+                    continue;
+                }
+
+                if (!detalhesOPME?.guia?.guiaOrigem) {
+                    console.log(`  ⚠️  Sem guia de origem`);
+                    
+                    resultados.semGuiaOrigem.push({
                         guiaOPME: detalhesOPME?.guia?.autorizacao || guiaOPME.idGuia,
                         guiaOrigem: "N/A",
                         tipoGuiaOrigem: "Sem guia de origem",
                         statusOrigem: "N/A",
                         itensOrigem: []
-                    };
-                    
-                    resultados.semGuiaOrigem.push(resultadoSemOrigem);
+                    });
                     continue;
                 }
 
@@ -106,19 +139,17 @@ app.get('/api/guias-opme-progress', async (req, res) => {
                 if (!guiaOrigem.autorizacao) {
                     console.log(`  ⚠️  Guia de origem sem número de autorização`);
                     
-                    const resultadoSemOrigem = {
+                    resultados.semGuiaOrigem.push({
                         guiaOPME: detalhesOPME.guia.autorizacao || guiaOPME.idGuia,
                         guiaOrigem: "N/A",
                         tipoGuiaOrigem: "Sem número de autorização",
                         statusOrigem: "N/A",
                         itensOrigem: []
-                    };
-                    
-                    resultados.semGuiaOrigem.push(resultadoSemOrigem);
+                    });
                     continue;
                 }
 
-                // Buscar status da guia de origem na API de eventos
+                // Buscar status da guia de origem com timeout
                 const statusOrigem = await buscarStatusGuiaOrigem(guiaOrigem.autorizacao, token);
                 
                 if (!statusOrigem) {
@@ -126,7 +157,7 @@ app.get('/api/guias-opme-progress', async (req, res) => {
                     continue;
                 }
 
-                // Buscar detalhes completos da guia de origem
+                // Buscar detalhes completos da guia de origem com timeout
                 const detalhesOrigem = await buscarDetalhesGuiaOrigem(guiaOrigem.id, token);
                 
                 const resultado = {
@@ -147,36 +178,45 @@ app.get('/api/guias-opme-progress', async (req, res) => {
 
             } catch (error) {
                 console.error(`Erro ao processar guia OPME ${guiaOPME.idGuia}:`, error.message);
+                
+                resultados.comErro.push({
+                    guiaOPME: guiaOPME.idGuia,
+                    guiaOrigem: "N/A",
+                    tipoGuiaOrigem: "Erro no processamento",
+                    statusOrigem: "N/A",
+                    itensOrigem: [],
+                    erro: error.message
+                });
             }
 
             // Pequeno delay para não sobrecarregar a API
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
         }
 
-        res.write(`data: ${JSON.stringify({
+        sendMessage({
             type: 'progress',
             percent: 98,
             message: 'Finalizando processamento...'
-        })}\n\n`);
+        });
 
         // Aguardar um pouco para mostrar o 100%
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        res.write(`data: ${JSON.stringify({
+        sendMessage({
             type: 'complete',
             resultados: resultados
-        })}\n\n`);
+        });
 
         console.log('Processamento concluído com sucesso!');
-        console.log(`Resumo: ${resultados.autorizadas.length} autorizadas, ${resultados.parcialmenteAutorizadas.length} parcialmente autorizadas, ${resultados.negadas.length} negadas, ${resultados.emAnalise.length} em análise, ${resultados.semGuiaOrigem.length} sem guia de origem`);
+        console.log(`Resumo: ${resultados.autorizadas.length} autorizadas, ${resultados.parcialmenteAutorizadas.length} parcialmente autorizadas, ${resultados.negadas.length} negadas, ${resultados.emAnalise.length} em análise, ${resultados.semGuiaOrigem.length} sem guia de origem, ${resultados.comErro.length} com erro`);
         res.end();
         
     } catch (error) {
         console.error('Erro no processamento SSE:', error);
-        res.write(`data: ${JSON.stringify({
+        sendMessage({
             type: 'error',
             message: error.message
-        })}\n\n`);
+        });
         res.end();
     }
 });
@@ -203,7 +243,7 @@ app.get('/health', (req, res) => {
 
 // ===== FUNÇÕES AUXILIARES ATUALIZADAS =====
 
-// Função para obter token
+// Função para obter token com timeout
 async function obterToken() {
     try {
         const controller = new AbortController();
@@ -300,7 +340,7 @@ async function buscarTodasGuiasOPME(token) {
 
             // Verificar se é a última página
             if (data.last === true) {
-                console.log(`Última página alcançada: ${page}`);
+                console.log(`Últltima página alcançada: ${page}`);
                 break;
             }
 
@@ -329,7 +369,7 @@ async function buscarTodasGuiasOPME(token) {
     return todasGuias;
 }
 
-// Buscar detalhes da guia OPME
+// Buscar detalhes da guia OPME com timeout
 async function buscarDetalhesGuiaOPME(idGuia, token) {
     const url = `${BASE_URL}/v2/buscar-guia/detalhamento-guia/${idGuia}/OPME`;
     
@@ -375,8 +415,7 @@ async function buscarDetalhesGuiaOPME(idGuia, token) {
     }
 }
 
-
-// Buscar status da guia de origem
+// Buscar status da guia de origem com timeout
 async function buscarStatusGuiaOrigem(numeroGuia, token) {
     const url = `${EVENTOS_GUIA_URL}/historico/prestador?page=0&size=10&tipoGuia=&statusSolicitacao=&statusRegulacao=&statusFaturamento=&numeroGuiaPrestador=&senha=&numeroGuia=${numeroGuia}&cpfBeneficiario=&codigoOuDescricao=&tipoProcesso=`;
     
@@ -427,7 +466,7 @@ async function buscarStatusGuiaOrigem(numeroGuia, token) {
     }
 }
 
-// Buscar detalhes completos da guia de origem
+// Buscar detalhes completos da guia de origem com timeout
 async function buscarDetalhesGuiaOrigem(idGuia, token) {
     const url = `${BASE_URL}/v2/buscar-guia/detalhamento-guia/${idGuia}/SOLICITACAO_INTERNACAO`;
     
@@ -507,7 +546,8 @@ async function buscarGuiasOPME() {
             parcialmenteAutorizadas: [],
             negadas: [],
             emAnalise: [],
-            semGuiaOrigem: []
+            semGuiaOrigem: [],
+            comErro: []
         };
 
         for (const guiaOPME of guiasOPME) {
@@ -515,18 +555,30 @@ async function buscarGuiasOPME() {
             
             const detalhesOPME = await buscarDetalhesGuiaOPME(guiaOPME.idGuia, token);
             
+            if (!detalhesOPME) {
+                console.log(`  ⚠️  Erro ao buscar detalhes da guia OPME`);
+                
+                resultados.comErro.push({
+                    guiaOPME: guiaOPME.idGuia,
+                    guiaOrigem: "N/A",
+                    tipoGuiaOrigem: "Erro ao buscar detalhes",
+                    statusOrigem: "N/A",
+                    itensOrigem: [],
+                    erro: "Falha na requisição de detalhes"
+                });
+                continue;
+            }
+
             if (!detalhesOPME?.guia?.guiaOrigem) {
                 console.log(`  ⚠️  Sem guia de origem`);
                 
-                const resultadoSemOrigem = {
+                resultados.semGuiaOrigem.push({
                     guiaOPME: detalhesOPME?.guia?.autorizacao || guiaOPME.idGuia,
                     guiaOrigem: "N/A",
                     tipoGuiaOrigem: "Sem guia de origem",
                     statusOrigem: "N/A",
                     itensOrigem: []
-                };
-                
-                resultados.semGuiaOrigem.push(resultadoSemOrigem);
+                });
                 continue;
             }
 
@@ -535,15 +587,13 @@ async function buscarGuiasOPME() {
             if (!guiaOrigem.autorizacao) {
                 console.log(`  ⚠️  Guia de origem sem número de autorização`);
                 
-                const resultadoSemOrigem = {
+                resultados.semGuiaOrigem.push({
                     guiaOPME: detalhesOPME.guia.autorizacao || guiaOPME.idGuia,
                     guiaOrigem: "N/A",
                     tipoGuiaOrigem: "Sem número de autorização",
                     statusOrigem: "N/A",
                     itensOrigem: []
-                };
-                
-                resultados.semGuiaOrigem.push(resultadoSemOrigem);
+                });
                 continue;
             }
 
@@ -570,7 +620,7 @@ async function buscarGuiasOPME() {
             };
 
             classificarResultado(resultados, resultado);
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
         }
 
         console.log("Busca concluída com sucesso!");
