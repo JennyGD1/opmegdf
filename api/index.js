@@ -6,12 +6,9 @@ const app = express();
 const PORT = 3000;
 
 // Configurações
-const GAS_TOKEN_URL = process.env.GAS_TOKEN_URL;
+const GAS_TOKEN_URL = "https://script.google.com/macros/s/AKfycbypQ1Smx0v-2w4brX8FV3D52op3RvKsfzyxoHNq05Fm5AdGDAHaYqvhN7lQ2VY4Ir-H/exec";
 const BASE_URL = "https://df-regulacao-api-live.gdf.live.maida.health";
 const EVENTOS_GUIA_URL = "https://df-eventos-guia-api-live.gdf.live.maida.health";
-
-// Timeouts para evitar problemas
-const REQUEST_TIMEOUT = 15000; // 15 segundos para API mais lenta
 
 // Middlewares
 app.use(cors());
@@ -50,6 +47,8 @@ app.get('/api/guias-opme-progress', async (req, res) => {
             return;
         }
 
+        console.log('Token obtido com sucesso');
+
         res.write(`data: ${JSON.stringify({
             type: 'progress',
             percent: 15,
@@ -59,6 +58,8 @@ app.get('/api/guias-opme-progress', async (req, res) => {
         const guiasOPME = await buscarTodasGuiasOPME(token);
         const total = guiasOPME.length;
         
+        console.log(`Total de guias encontradas: ${total}`);
+
         res.write(`data: ${JSON.stringify({
             type: 'progress',
             percent: 25,
@@ -72,6 +73,16 @@ app.get('/api/guias-opme-progress', async (req, res) => {
             emAnalise: [],
             semGuiaOrigem: []
         };
+
+        // Se não encontrou guias, tentar método alternativo
+        if (total === 0) {
+            res.write(`data: ${JSON.stringify({
+                type: 'error',
+                message: 'Não foi possível buscar as guias OPME. A API pode estar indisponível.'
+            })}\n\n`);
+            res.end();
+            return;
+        }
 
         for (let i = 0; i < guiasOPME.length; i++) {
             const guiaOPME = guiasOPME[i];
@@ -89,6 +100,11 @@ app.get('/api/guias-opme-progress', async (req, res) => {
                 // Buscar detalhes da guia OPME
                 const detalhesOPME = await buscarDetalhesGuiaOPME(guiaOPME.idGuia, token);
                 
+                if (!detalhesOPME) {
+                    console.log(`  ❌ Erro ao buscar detalhes da guia OPME`);
+                    continue;
+                }
+
                 if (!detalhesOPME?.guia?.guiaOrigem) {
                     console.log(`  ⚠️  Sem guia de origem`);
                     
@@ -117,6 +133,8 @@ app.get('/api/guias-opme-progress', async (req, res) => {
                     continue;
                 }
 
+                console.log(`  📋 Guia origem: ${guiaOrigem.autorizacao}`);
+
                 // Buscar status da guia de origem
                 const statusOrigem = await buscarStatusGuiaOrigem(guiaOrigem.autorizacao, token);
                 
@@ -124,6 +142,8 @@ app.get('/api/guias-opme-progress', async (req, res) => {
                     console.log(`  ⚠️  Status da guia de origem não encontrado`);
                     continue;
                 }
+
+                console.log(`  📊 Status origem: ${statusOrigem}`);
 
                 // Buscar detalhes completos da guia de origem
                 const detalhesOrigem = await buscarDetalhesGuiaOrigem(guiaOrigem.id, token);
@@ -148,8 +168,8 @@ app.get('/api/guias-opme-progress', async (req, res) => {
                 console.error(`Erro ao processar guia OPME ${guiaOPME.idGuia}:`, error.message);
             }
 
-            // Delay maior para API do GDF
-            await new Promise(resolve => setTimeout(resolve, 300));
+            // Delay para não sobrecarregar
+            await new Promise(resolve => setTimeout(resolve, 200));
         }
 
         res.write(`data: ${JSON.stringify({
@@ -166,6 +186,13 @@ app.get('/api/guias-opme-progress', async (req, res) => {
         })}\n\n`);
 
         console.log('Processamento concluído com sucesso!');
+        console.log('Resumo:', {
+            autorizadas: resultados.autorizadas.length,
+            parcialmenteAutorizadas: resultados.parcialmenteAutorizadas.length,
+            negadas: resultados.negadas.length,
+            emAnalise: resultados.emAnalise.length,
+            semGuiaOrigem: resultados.semGuiaOrigem.length
+        });
         res.end();
         
     } catch (error) {
@@ -178,112 +205,78 @@ app.get('/api/guias-opme-progress', async (req, res) => {
     }
 });
 
-// ===== FUNÇÕES AUXILIARES PARA API DO GDF =====
+// ===== FUNÇÕES AUXILIARES SIMPLIFICADAS =====
 
-// Função para obter token com timeout
+// Função para obter token
 async function obterToken() {
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
-        
-        const response = await fetch(GAS_TOKEN_URL, {
-            signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        return await response.json().then(data => data.token);
+        console.log('Buscando token...');
+        const response = await fetch(GAS_TOKEN_URL);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log('Token obtido com sucesso');
+        return data.token;
     } catch (error) {
         console.error("Erro ao obter token:", error);
         return null;
     }
 }
 
-// Buscar todas as guias OPME em análise (API do GDF)
+// Buscar todas as guias OPME em análise - Versão simplificada
 async function buscarTodasGuiasOPME(token) {
-    let todasGuias = [];
-    let page = 0;
-    let hasMore = true;
-
-    while (hasMore) {
-        const url = `${BASE_URL}/v2/cotacao-opme/em-analise?page=${page}&size=50`;
-        
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
-            
-            console.log(`Buscando página ${page}...`);
-            const response = await fetch(url, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                console.log(`Erro HTTP ${response.status} na página ${page}`);
-                break;
-            }
-
-            const data = await response.json();
-            
-            console.log(`Página ${page}:`, {
-                contentLength: data.content?.length,
-                totalElements: data.totalElements,
-                totalPages: data.totalPages,
-                last: data.last
-            });
-
-            if (data.content && data.content.length > 0) {
-                todasGuias = todasGuias.concat(data.content);
-                console.log(`Página ${page}: ${data.content.length} guias encontradas`);
-                
-                // Verificar se há mais páginas
-                if (data.last === true || page >= (data.totalPages || 10) - 1) {
-                    hasMore = false;
-                } else {
-                    page++;
-                }
-            } else {
-                hasMore = false;
-            }
-
-            // Delay entre páginas
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-        } catch (error) {
-            if (error.name === 'AbortError') {
-                console.error(`Timeout ao buscar página ${page}`);
-            } else {
-                console.error(`Erro ao buscar página ${page}:`, error);
-            }
-            hasMore = false;
-        }
-    }
-
-    console.log(`Total de guias encontradas: ${todasGuias.length}`);
-    return todasGuias;
-}
-
-// Buscar detalhes da guia OPME
-async function buscarDetalhesGuiaOPME(idGuia, token) {
-    const url = `${BASE_URL}/v2/buscar-guia/detalhamento-guia/${idGuia}/OPME`;
-    
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+        console.log('Buscando guias OPME...');
+        const url = `${BASE_URL}/v2/cotacao-opme/em-analise?page=0&size=20`;
+        
+        console.log('URL:', url);
         
         const response = await fetch(url, {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
-            signal: controller.signal
+            // Timeout de 30 segundos
+            signal: AbortSignal.timeout(30000)
         });
 
-        clearTimeout(timeoutId);
+        console.log('Status da resposta:', response.status);
+        
+        if (!response.ok) {
+            console.log('Response not OK:', response.status, response.statusText);
+            return [];
+        }
+
+        const data = await response.json();
+        console.log('Dados recebidos:', {
+            contentLength: data.content?.length,
+            totalElements: data.totalElements,
+            totalPages: data.totalPages
+        });
+
+        return data.content || [];
+        
+    } catch (error) {
+        console.error('Erro ao buscar guias OPME:', error.message);
+        if (error.name === 'TimeoutError') {
+            console.error('Timeout na requisição das guias OPME');
+        }
+        return [];
+    }
+}
+
+// Buscar detalhes da guia OPME - Versão simplificada
+async function buscarDetalhesGuiaOPME(idGuia, token) {
+    try {
+        const url = `${BASE_URL}/v2/buscar-guia/detalhamento-guia/${idGuia}/OPME`;
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            signal: AbortSignal.timeout(15000)
+        });
 
         if (!response.ok) {
             console.log(`Erro ${response.status} ao buscar detalhes da guia OPME ${idGuia}`);
@@ -291,7 +284,7 @@ async function buscarDetalhesGuiaOPME(idGuia, token) {
         }
         return await response.json();
     } catch (error) {
-        if (error.name === 'AbortError') {
+        if (error.name === 'TimeoutError') {
             console.error(`Timeout ao buscar detalhes da guia OPME ${idGuia}`);
         } else {
             console.error(`Erro ao buscar detalhes da guia OPME ${idGuia}:`, error.message);
@@ -300,23 +293,17 @@ async function buscarDetalhesGuiaOPME(idGuia, token) {
     }
 }
 
-// Buscar status da guia de origem
+// Buscar status da guia de origem - Versão simplificada
 async function buscarStatusGuiaOrigem(numeroGuia, token) {
-    const url = `${EVENTOS_GUIA_URL}/historico/prestador?page=0&size=10&numeroGuia=${numeroGuia}`;
-    
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
-        
+        const url = `${EVENTOS_GUIA_URL}/historico/prestador?page=0&size=10&numeroGuia=${numeroGuia}`;
         const response = await fetch(url, {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
-            signal: controller.signal
+            signal: AbortSignal.timeout(15000)
         });
-
-        clearTimeout(timeoutId);
 
         if (!response.ok) {
             console.log(`Erro ${response.status} ao buscar status da guia ${numeroGuia}`);
@@ -331,7 +318,7 @@ async function buscarStatusGuiaOrigem(numeroGuia, token) {
         
         return "Status não encontrado";
     } catch (error) {
-        if (error.name === 'AbortError') {
+        if (error.name === 'TimeoutError') {
             console.error(`Timeout ao buscar status da guia ${numeroGuia}`);
         } else {
             console.error(`Erro ao buscar status da guia ${numeroGuia}:`, error.message);
@@ -340,23 +327,17 @@ async function buscarStatusGuiaOrigem(numeroGuia, token) {
     }
 }
 
-// Buscar detalhes completos da guia de origem
+// Buscar detalhes completos da guia de origem - Versão simplificada
 async function buscarDetalhesGuiaOrigem(idGuia, token) {
-    const url = `${BASE_URL}/v2/buscar-guia/detalhamento-guia/${idGuia}/SOLICITACAO_INTERNACAO`;
-    
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
-        
+        const url = `${BASE_URL}/v2/buscar-guia/detalhamento-guia/${idGuia}/SOLICITACAO_INTERNACAO`;
         const response = await fetch(url, {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
-            signal: controller.signal
+            signal: AbortSignal.timeout(15000)
         });
-
-        clearTimeout(timeoutId);
 
         if (!response.ok) {
             console.log(`Erro ${response.status} ao buscar detalhes da guia de origem ${idGuia}`);
@@ -364,7 +345,7 @@ async function buscarDetalhesGuiaOrigem(idGuia, token) {
         }
         return await response.json();
     } catch (error) {
-        if (error.name === 'AbortError') {
+        if (error.name === 'TimeoutError') {
             console.error(`Timeout ao buscar detalhes da guia de origem ${idGuia}`);
         } else {
             console.error(`Erro ao buscar detalhes da guia de origem ${idGuia}:`, error.message);
