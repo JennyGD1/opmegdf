@@ -206,11 +206,37 @@ app.get('/health', (req, res) => {
 // Função para obter token
 async function obterToken() {
     try {
-        const response = await fetch(GAS_TOKEN_URL);
-        const data = await response.json();
-        return data.token;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+        
+        const response = await fetch(GAS_TOKEN_URL, {
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const text = await response.text();
+        if (!text) {
+            throw new Error('Resposta vazia do servidor de token');
+        }
+        
+        try {
+            const data = JSON.parse(text);
+            return data.token;
+        } catch (parseError) {
+            console.error("Erro ao fazer parse do token:", parseError);
+            return null;
+        }
     } catch (error) {
-        console.error("Erro ao obter token:", error);
+        if (error.name === 'AbortError') {
+            console.error("Timeout ao obter token");
+        } else {
+            console.error("Erro ao obter token:", error);
+        }
         return null;
     }
 }
