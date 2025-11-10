@@ -17,6 +17,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.get('/', (req, res) => {
+    // Certifique-se que o Render reconhece 'public' como o diretório onde o index.html está
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // Funções de Utilitário e API
 
 async function obterToken() {
