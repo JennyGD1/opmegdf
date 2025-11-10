@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Maida Health - Guias OPME</title>
+    <title>INAS OPME</title>
     <style>
         :root {
             --maida-branco: #ffffff;
@@ -13,458 +13,90 @@
             --maida-cinza-escuro: #585958;
             --cinza-claro-fundo: #f8f9fa;
             --maida-cinza-claro: #dddddd;
+            --vermelho-negado: #dc3545;
+            --verde-autorizado: #28a745;
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--cinza-claro-fundo); color: var(--maida-cinza-escuro); line-height: 1.6; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0; }
+        .header { background: var(--maida-azul); color: var(--maida-branco); padding: 1.5rem 2rem; border-radius: 15px; margin-bottom: 2rem; box-shadow: 0 4px 15px rgba(0, 112, 255, 0.2); text-align: center; }
+        .header h1 { font-size: 1.5rem; font-weight: 700; margin: 0; }
+        .controls { background: var(--maida-branco); padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); text-align: center; }
+        .btn-buscar { background: var(--maida-azul); color: var(--maida-branco); border: none; padding: 12px 30px; font-size: 1.1rem; border-radius: 25px; cursor: pointer; transition: all 0.3s ease; font-weight: 600; box-shadow: 0 4px 15px rgba(0, 112, 255, 0.3); }
+        .btn-buscar:hover:not(:disabled) { background: var(--maida-rosa); box-shadow: 0 6px 20px rgba(255, 0, 115, 0.4); }
+        .btn-buscar:disabled { background: var(--maida-cinza-claro); color: var(--maida-cinza-escuro); cursor: not-allowed; transform: none; box-shadow: none; }
+        
+        .loading { display: none; text-align: center; margin: 2rem 0; padding: 1.5rem; background: #fff; border-radius: 12px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); }
+        .spinner { border: 4px solid var(--maida-cinza-claro); border-top: 4px solid var(--maida-azul); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 1rem; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .progress-container { background: var(--maida-cinza-claro); border-radius: 10px; height: 20px; margin: 1rem auto; max-width: 400px; overflow: hidden; position: relative; }
+        .progress-bar { background: var(--maida-azul); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 10px; }
+        .progress-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--maida-branco); font-weight: 600; font-size: 0.9rem; }
+        .progress-details { margin-top: 0.5rem; font-size: 0.9rem; color: var(--maida-cinza-escuro); }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--cinza-claro-fundo);
-            color: var(--maida-cinza-escuro);
-            line-height: 1.6;
-        }
+        .resumo { background: var(--maida-branco); padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); }
+        .resumo h2 { margin-bottom: 1rem; color: var(--maida-azul); }
+        .resumo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+        .resumo-item { text-align: center; padding: 1rem; border-radius: 8px; background: var(--cinza-claro-fundo); border: 1px solid var(--maida-cinza-claro); }
+        .resumo-item.autorizadas { border-left: 4px solid var(--verde-autorizado); background: #f8fff9; }
+        .resumo-item.parciais { border-left: 4px solid var(--maida-amarelo); background: #fffef5; }
+        .resumo-item.negadas { border-left: 4px solid var(--vermelho-negado); background: #fff5f5; }
+        .resumo-item.analise { border-left: 4px solid var(--maida-azul); background: #f5f9ff; }
+        .resumo-item.semGuiaOrigem { border-left: 4px solid #6c757d; background: #f8f9fa; }
+        .resumo-numero { font-size: 2rem; font-weight: bold; margin-bottom: 0.5rem; color: var(--maida-azul); }
+        .resumo-item.autorizadas .resumo-numero { color: var(--verde-autorizado); }
+        .resumo-item.parciais .resumo-numero { color: #856404; }
+        .resumo-item.negadas .resumo-numero { color: var(--vermelho-negado); }
+        .resumo-porcentagem { font-size: 0.8rem; color: var(--maida-cinza-escuro); opacity: 0.8; }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
+        .guias-container { display: grid; gap: 1rem; }
+        .categoria { margin-bottom: 2rem; }
+        .categoria-titulo { background: var(--maida-branco); padding: 1rem 1.5rem; border-radius: 10px; margin-bottom: 1rem; font-size: 1.3rem; font-weight: 600; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--maida-cinza-claro); }
+        .categoria-stats { font-size: 1rem; color: var(--maida-cinza-escuro); opacity: 0.8; }
+        
+        .guia-card { background: var(--maida-branco); border-radius: 10px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); transition: all 0.3s ease; border-left: 4px solid var(--maida-azul); border: 1px solid var(--maida-cinza-claro); }
+        .categoria-autorizadas .guia-card { border-left-color: var(--verde-autorizado); }
+        .categoria-parcialmenteAutorizadas .guia-card { border-left-color: var(--maida-amarelo); }
+        .categoria-negadas .guia-card { border-left-color: var(--vermelho-negado); }
+        .categoria-semGuiaOrigem .guia-card { border-left-color: #6c757d; }
+        
+        .guia-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+        .guia-info h3 { color: var(--maida-azul); margin-bottom: 0.5rem; font-size: 1.1rem; }
+        .guia-detalhes { color: var(--maida-cinza-escuro); font-size: 0.95rem; }
+        
+        .guia-status { padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; border: 1px solid rgba(0, 0, 0, 0.1); }
+        .status-autorizada { background: #d4edda; color: #155724; border-color: #c3e6cb; }
+        .status-parcial { background: #fff3cd; color: #856404; border-color: #ffeaa7; }
+        .status-negada { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+        .status-analise { background: #cce7ff; color: var(--maida-azul); border-color: #b3d9ff; }
+        .status-nao-encontrada { background: #e9ecef; color: #6c757d; border-color: #d8dadf; }
 
-        .header {
-            background: var(--maida-azul);
-            color: var(--maida-branco);
-            padding: 1.5rem 2rem;
-            border-radius: 15px;
-            margin-bottom: 2rem;
-            box-shadow: 0 4px 15px rgba(0, 112, 255, 0.2);
-            display: grid;
-            grid-template-columns: 120px 1fr 120px;
-            align-items: center;
-            justify-items: center;
-            position: relative;
-        }
-        .header-content {
-            text-align: center;
-            grid-column: 1 / -1;
-            justify-self: center;
-            max-width: 600px;
-        }
+        .expand-btn { background: none; border: none; font-size: 1rem; color: var(--maida-azul); cursor: pointer; transition: transform 0.3s ease; padding: 5px; border-radius: 50%; }
+        .expand-btn.expanded { transform: rotate(180deg); color: var(--maida-rosa); }
+        .itens-container { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--maida-cinza-claro); display: none; }
+        .itens-container.show { display: block; }
 
-        .header h1 {
-            font-size: 1.5rem;
-            font-weight: 700;
-            grid-column: 2;
-            margin: 0;
-        }
+        .item-lista { background: var(--cinza-claro-fundo); padding: 0.8rem; margin-bottom: 0.5rem; border-radius: 6px; border-left: 3px solid var(--maida-rosa); border: 1px solid var(--maida-cinza-claro); }
+        .item-codigo { font-weight: bold; color: var(--maida-azul); font-size: 0.9rem; }
+        .item-descricao { color: var(--maida-cinza-escuro); margin: 0.3rem 0; font-size: 0.95rem; }
+        .item-quantidades { margin-top: 0.5rem; font-size: 0.85rem; font-weight: 500; }
+        .quant-solicitada { color: var(--maida-cinza-escuro); font-weight: bold; }
+        .quant-autorizada { color: var(--verde-autorizado); font-weight: bold; }
+        .quant-nao-autorizada { color: var(--vermelho-negado); font-weight: bold; }
 
-        .header p {
-            font-size: 1rem;
-            opacity: 0.9;
-            margin: 0;
-        }
-
-        .maidalogo {
-            width: 120px;
-            height: auto;
-            grid-column: 1;
-            justify-self: start;
-        }
-        .controls {
-            background: var(--maida-branco);
-            padding: 1.5rem;
-            border-radius: 12px;
-            margin-bottom: 2rem;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            text-align: center;
-        }
-
-        .btn-buscar {
-            background: var(--maida-azul);
-            color: var(--maida-branco);
-            border: none;
-            padding: 12px 30px;
-            font-size: 1.1rem;
-            border-radius: 25px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: 600;
-            box-shadow: 0 4px 15px rgba(0, 112, 255, 0.3);
-        }
-
-        .btn-buscar:hover {
-            background: var(--maida-rosa);
-            box-shadow: 0 6px 20px rgba(255, 0, 115, 0.4);
-        }
-
-        .btn-buscar:disabled {
-            background: var(--maida-cinza-claro);
-            color: var(--maida-cinza-escuro);
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        .loading {
-            display: none;
-            text-align: center;
-            margin: 2rem 0;
-        }
-
-        .spinner {
-            border: 4px solid var(--maida-cinza-claro);
-            border-top: 4px solid var(--maida-azul);
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .progress-container {
-            background: var(--maida-cinza-claro);
-            border-radius: 10px;
-            height: 20px;
-            margin: 1rem auto;
-            max-width: 400px;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .progress-bar {
-            background: var(--maida-azul);
-            height: 100%;
-            width: 0%;
-            transition: width 0.3s ease;
-            border-radius: 10px;
-        }
-
-        .progress-text {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: var(--maida-branco);
-            font-weight: 600;
-            font-size: 0.9rem;
-        }
-
-        .progress-details {
-            margin-top: 0.5rem;
-            font-size: 0.9rem;
-            color: var(--maida-cinza-escuro);
-        }
-
-        .resumo {
-            background: var(--maida-branco);
-            padding: 1.5rem;
-            border-radius: 12px;
-            margin-bottom: 2rem;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        .resumo-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-
-        .resumo-item {
-            text-align: center;
-            padding: 1rem;
-            border-radius: 8px;
-            background: var(--cinza-claro-fundo);
-            transition: transform 0.2s ease;
-            border: 1px solid var(--maida-cinza-claro);
-        }
-
-        .resumo-item:hover {
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-
-        .resumo-item.autorizadas { 
-            border-left: 4px solid #28a745;
-            background: #f8fff9;
-        }
-
-        .resumo-item.parciais { 
-            border-left: 4px solid var(--maida-amarelo);
-            background: #fffef5;
-        }
-
-        .resumo-item.negadas { 
-            border-left: 4px solid #dc3545;
-            background: #fff5f5;
-        }
-
-        .resumo-item.analise { 
-            border-left: 4px solid var(--maida-azul);
-            background: #f5f9ff;
-        }
-
-        .resumo-numero {
-            font-size: 2rem;
-            font-weight: bold;
-            margin-bottom: 0.5rem;
-        }
-
-        .resumo-porcentagem {
-            font-size: 0.8rem;
-            color: var(--maida-cinza-escuro);
-            opacity: 0.8;
-        }
-
-        .guias-container {
-            display: grid;
-            gap: 1rem;
-        }
-
-        .categoria {
-            margin-bottom: 2rem;
-        }
-
-        .categoria-titulo {
-            background: var(--maida-branco);
-            padding: 1rem 1.5rem;
-            border-radius: 10px;
-            margin-bottom: 1rem;
-            font-size: 1.3rem;
-            font-weight: 600;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border: 1px solid var(--maida-cinza-claro);
-        }
-
-        .categoria-stats {
-            font-size: 1rem;
-            color: var(--maida-cinza-escuro);
-            opacity: 0.8;
-        }
-
-        .guia-card {
-            background: var(--maida-branco);
-            border-radius: 10px;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s ease;
-            border-left: 4px solid var(--maida-azul);
-            border: 1px solid var(--maida-cinza-claro);
-        }
-
-        .guia-card:hover {
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-            border-left-color: var(--maida-rosa);
-        }
-
-        .guia-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-        }
-
-        .guia-info h3 {
-            color: var(--maida-azul);
-            margin-bottom: 0.5rem;
-            font-size: 1.1rem;
-        }
-
-        .guia-detalhes {
-            color: var(--maida-cinza-escuro);
-            font-size: 0.95rem;
-        }
-
-        .guia-status {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            border: 1px solid rgba(0, 0, 0, 0.1);
-        }
-
-        .status-autorizada { 
-            background: #d4edda; 
-            color: #155724; 
-            border-color: #c3e6cb;
-        }
-
-        .status-parcial { 
-            background: #fff3cd; 
-            color: #856404; 
-            border-color: #ffeaa7;
-        }
-
-        .status-negada { 
-            background: #f8d7da; 
-            color: #721c24; 
-            border-color: #f5c6cb;
-        }
-
-        .status-analise { 
-            background: #cce7ff; 
-            color: var(--maida-azul); 
-            border-color: #b3d9ff;
-        }
-
-        .expand-btn {
-            background: none;
-            border: none;
-            font-size: 1rem;
-            color: var(--maida-azul);
-            cursor: pointer;
-            transition: transform 0.3s ease;
-            padding: 5px;
-            border-radius: 50%;
-        }
-
-        .expand-btn:hover {
-            background: var(--cinza-claro-fundo);
-        }
-
-        .expand-btn.expanded {
-            transform: rotate(180deg);
-            color: var(--maida-rosa);
-        }
-
-        .itens-container {
-            margin-top: 1rem;
-            padding-top: 1rem;
-            border-top: 1px solid var(--maida-cinza-claro);
-            display: none;
-        }
-
-        .itens-container.show {
-            display: block;
-        }
-
-        .item-lista {
-            background: var(--cinza-claro-fundo);
-            padding: 1rem;
-            margin-bottom: 0.5rem;
-            border-radius: 6px;
-            border-left: 3px solid var(--maida-rosa);
-            border: 1px solid var(--maida-cinza-claro);
-        }
-
-        .item-codigo {
-            font-weight: bold;
-            color: var(--maida-azul);
-        }
-
-        .item-descricao {
-            color: var(--maida-cinza-escuro);
-            margin: 0.3rem 0;
-        }
-
-        .item-quantidades {
-            margin-top: 0.5rem;
-            font-size: 0.9rem;
-        }
-
-        .quant-solicitada { 
-            color: var(--maida-cinza-escuro); 
-        }
-
-        .quant-autorizada { 
-            color: #28a745; 
-            font-weight: bold; 
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 3rem;
-            color: var(--maida-cinza-escuro);
-            background: var(--maida-branco);
-            border-radius: 12px;
-            border: 1px solid var(--maida-cinza-claro);
-        }
-
-        .empty-state i {
-            font-size: 3rem;
-            color: var(--maida-cinza-claro);
-            margin-bottom: 1rem;
-        }
-
-        /* Estados vazios */
-        .resumo-item:empty,
-        .guia-card:empty,
-        .categoria:empty {
-            display: none;
-        }
-
-        /* Responsividade */
+        .empty-state { text-align: center; padding: 3rem; color: var(--maida-cinza-escuro); background: var(--maida-branco); border-radius: 12px; border: 1px solid var(--maida-cinza-claro); }
+        
         @media (max-width: 768px) {
-            .container {
-                padding: 10px;
-            }
-            
-            .header {
-                grid-template-columns: 1fr;
-                text-align: center;
-                padding: 1.5rem;
-                gap: 1rem;
-            }
-            .header h1 {
-                grid-column: 1;
-                order: 2;
-            }
-            .maidalogo {
-                justify-self: center;
-                grid-column: 1;
-                grid-row: 1;
-            }
-            
-            .header-content {
-                grid-column: 1;
-                grid-row: 2;
-            }
-            
-            .categoria-titulo {
-                flex-direction: column;
-                gap: 0.5rem;
-                text-align: center;
-            }
-            
-            .guia-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 1rem;
-            }
-            
-            .resumo-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        @media (max-width: 480px) {
-            .resumo-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .btn-buscar {
-                width: 100%;
-                padding: 15px 30px;
-            }
+            .guia-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
+            .guia-status { align-self: flex-end; }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <img src="./img/logo_maida_branca.png" class="maidalogo" id="maidalogo">
-            <h1>Guias OPME (INAS)</h1>
+            <h1>OPME (INAS)</h1>
         </div>
 
         <div class="controls">
@@ -485,83 +117,80 @@
         </div>
 
         <div class="resumo" id="resumo" style="display: none;">
-            <h2>Resumo</h2>
-            <div class="stats-bar" id="statsBar"></div>
+            <h2>Resumo das Guias de Origem</h2>
             <div class="resumo-grid" id="resumoGrid">
-                <!-- Preenchido dinamicamente -->
-            </div>
+                </div>
         </div>
 
         <div class="guias-container" id="guiasContainer">
-            <!-- Preenchido dinamicamente -->
-        </div>
+                </div>
     </div>
 
     <script>
-        let totalGuias = 0;
-        let guiasProcessadas = 0;
+        // O frontend se comunica com o backend rodando em http://localhost:3000
+        const API_SERVER_URL = 'http://localhost:3000/api/guias-opme-progress';
 
-        document.getElementById('btnBuscar').addEventListener('click', buscarGuias);
+        document.getElementById('btnBuscar').addEventListener('click', iniciarBusca);
 
-        async function buscarGuias() {
+        // --- FUNÇÕES DE LÓGICA DE INTERFACE ---
+        
+        async function iniciarBusca() {
             const btnBuscar = document.getElementById('btnBuscar');
             const loading = document.getElementById('loading');
             const resumo = document.getElementById('resumo');
             const guiasContainer = document.getElementById('guiasContainer');
-            const progressBar = document.getElementById('progressBar');
-            const progressText = document.getElementById('progressText');
-            const progressDetails = document.getElementById('progressDetails');
 
-            // Resetar contadores
-            totalGuias = 0;
-            guiasProcessadas = 0;
-
-            // Mostrar loading
+            // 1. Resetar e mostrar loading
             btnBuscar.disabled = true;
             loading.style.display = 'block';
             resumo.style.display = 'none';
             guiasContainer.innerHTML = '';
-            atualizarProgresso(0, 'Iniciando busca...');
+            atualizarProgresso(0, 'Conectando ao servidor backend...');
 
-            try {
-                // Usando EventSource para receber atualizações em tempo real
-                const eventSource = new EventSource('/api/guias-opme-progress');
+            // 2. Conectar ao endpoint SSE do backend
+            const eventSource = new EventSource(API_SERVER_URL);
+
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
                 
-                eventSource.onmessage = function(event) {
-                    const data = JSON.parse(event.data);
-                    
-                    if (data.type === 'progress') {
-                        atualizarProgresso(data.percent, data.message);
-                    } else if (data.type === 'complete') {
-                        eventSource.close();
-                        exibirResultados(data.resultados);
-                        btnBuscar.disabled = false;
-                        loading.style.display = 'none';
-                    } else if (data.type === 'error') {
-                        eventSource.close();
-                        throw new Error(data.message);
-                    }
-                };
-
-                eventSource.onerror = function() {
+                if (data.type === 'progress') {
+                    atualizarProgresso(data.percent, data.message);
+                } else if (data.type === 'complete') {
                     eventSource.close();
-                    throw new Error('Erro na conexão com o servidor');
-                };
+                    exibirResultados(data.resultados);
+                    atualizarProgresso(100, 'Busca concluída com sucesso!');
+                    btnBuscar.disabled = false;
+                    loading.style.display = 'none';
+                } else if (data.type === 'error') {
+                    eventSource.close();
+                    handleFailure(new Error(data.message));
+                    btnBuscar.disabled = false;
+                    loading.style.display = 'none';
+                }
+            };
 
-            } catch (error) {
-                console.error('Erro ao buscar guias:', error);
-                guiasContainer.innerHTML = `
-                    <div class="empty-state">
-                        <div style="font-size: 3rem;">❌</div>
-                        <h3>Erro ao buscar guias</h3>
-                        <p>${error.message}</p>
-                    </div>
-                `;
+            eventSource.onerror = function(error) {
+                eventSource.close();
+                console.error('Erro na conexão SSE:', error);
+                handleFailure(new Error('Erro na conexão com o servidor de backend. Verifique se o server.js está rodando.'));
                 btnBuscar.disabled = false;
                 loading.style.display = 'none';
-            }
+            };
         }
 
+        function handleFailure(error) {
+            const guiasContainer = document.getElementById('guiasContainer');
+            console.error('Erro geral na aplicação:', error);
+            guiasContainer.innerHTML = `
+                <div class="empty-state">
+                    <div style="font-size: 3rem;">❌</div>
+                    <h3>Erro na Execução</h3>
+                    <p>${error.message || 'Ocorreu um erro desconhecido.'}</p>
+                    <p style="margin-top: 10px;">Certifique-se de ter executado 'npm install' e iniciado o servidor com 'node server.js'.</p>
+                </div>
+            `;
+        }
+        
         function atualizarProgresso(percent, message) {
             const progressBar = document.getElementById('progressBar');
             const progressText = document.getElementById('progressText');
@@ -575,30 +204,34 @@
         function exibirResultados(resultados) {
             const resumo = document.getElementById('resumo');
             const resumoGrid = document.getElementById('resumoGrid');
-            const statsBar = document.getElementById('statsBar');
             const guiasContainer = document.getElementById('guiasContainer');
 
             const total = Object.values(resultados).reduce((sum, arr) => sum + arr.length, 0);
             
-            // Calcular porcentagens
+            if (total === 0) {
+                 guiasContainer.innerHTML = `<div class="empty-state">... Nenhuma guia encontrada ...</div>`;
+                 return;
+            }
+
+            const getPercentage = (count) => total > 0 ? (count / total * 100).toFixed(1) : 0;
+
             const porcentagens = {
-                autorizadas: total > 0 ? (resultados.autorizadas.length / total * 100).toFixed(1) : 0,
-                parcialmenteAutorizadas: total > 0 ? (resultados.parcialmenteAutorizadas.length / total * 100).toFixed(1) : 0,
-                negadas: total > 0 ? (resultados.negadas.length / total * 100).toFixed(1) : 0,
-                emAnalise: total > 0 ? (resultados.emAnalise.length / total * 100).toFixed(1) : 0,
-                semGuiaOrigem: total > 0 ? (resultados.semGuiaOrigem.length / total * 100).toFixed(1) : 0
+                autorizadas: getPercentage(resultados.autorizadas.length),
+                parcialmenteAutorizadas: getPercentage(resultados.parcialmenteAutorizadas.length),
+                negadas: getPercentage(resultados.negadas.length),
+                emAnalise: getPercentage(resultados.emAnalise.length),
+                semGuiaOrigem: getPercentage(resultados.semGuiaOrigem.length)
             };
 
-            // Atualizar resumo
             resumoGrid.innerHTML = `
                 <div class="resumo-item autorizadas">
                     <div class="resumo-numero">${resultados.autorizadas.length}</div>
-                    <div>✅ Autorizadas</div>
+                    <div>✅ Autorizadas / Executadas</div>
                     <div class="resumo-porcentagem">${porcentagens.autorizadas}%</div>
                 </div>
                 <div class="resumo-item parciais">
                     <div class="resumo-numero">${resultados.parcialmenteAutorizadas.length}</div>
-                    <div>⚠️ Parcialmente Autorizadas</div>
+                    <div>⚠️ Autorizadas Parcialmente</div>
                     <div class="resumo-porcentagem">${porcentagens.parcialmenteAutorizadas}%</div>
                 </div>
                 <div class="resumo-item negadas">
@@ -611,7 +244,7 @@
                     <div>⏳ Em Análise</div>
                     <div class="resumo-porcentagem">${porcentagens.emAnalise}%</div>
                 </div>
-                <div class="resumo-item" style="border-left: 4px solid #6c757d; background: #f8f9fa;">
+                <div class="resumo-item semGuiaOrigem">
                     <div class="resumo-numero">${resultados.semGuiaOrigem.length}</div>
                     <div>❓ Sem Guia Origem</div>
                     <div class="resumo-porcentagem">${porcentagens.semGuiaOrigem}%</div>
@@ -619,44 +252,22 @@
             `;
             resumo.style.display = 'block';
 
-            // Exibir guias por categoria
             guiasContainer.innerHTML = '';
 
             const categorias = [
-                { 
-                    chave: 'autorizadas', 
-                    titulo: '📋 Guias de OPME com Guia de Origem Autorizadas',
-                    icon: '✅'
-                },
-                { 
-                    chave: 'parcialmenteAutorizadas', 
-                    titulo: '⚠️ Guias de OPME com Guia de Origem Parcialmente Autorizadas',
-                    icon: '⚠️'
-                },
-                { 
-                    chave: 'negadas', 
-                    titulo: '❌ Guias de OPME com Guia de Origem Negadas',
-                    icon: '❌'
-                },
-                { 
-                    chave: 'emAnalise', 
-                    titulo: '⏳ Guias de OPME com Guia de Origem em Análise',
-                    icon: '⏳'
-                },
-                { 
-                    chave: 'semGuiaOrigem', 
-                    titulo: '❓ Guias de OPME sem Guia de Origem',
-                    icon: '❓'
-                }
+                { chave: 'parcialmenteAutorizadas', titulo: '⚠️ Guias de OPME c/ Origem Autorizada Parcialmente', icon: '⚠️' },
+                { chave: 'negadas', titulo: '❌ Guias de OPME c/ Origem Negada', icon: '❌' },
+                { chave: 'autorizadas', titulo: '✅ Guias de OPME c/ Origem Autorizada/Executada', icon: '✅' },
+                { chave: 'emAnalise', titulo: '⏳ Guias de OPME c/ Origem Em Análise', icon: '⏳' },
+                { chave: 'semGuiaOrigem', titulo: '❓ Guias de OPME Sem Guia de Origem / Erro', icon: '❓' }
             ];
 
             categorias.forEach(categoria => {
                 if (resultados[categoria.chave].length > 0) {
                     const categoriaDiv = document.createElement('div');
-                    categoriaDiv.className = 'categoria';
+                    categoriaDiv.className = `categoria categoria-${categoria.chave}`;
                     
-                    const porcentagemCategoria = total > 0 ? 
-                        ((resultados[categoria.chave].length / total * 100).toFixed(1)) : 0;
+                    const porcentagemCategoria = getPercentage(resultados[categoria.chave].length);
 
                     categoriaDiv.innerHTML = `
                         <div class="categoria-titulo">
@@ -668,6 +279,10 @@
                     `;
 
                     resultados[categoria.chave].forEach(guia => {
+                        // Não precisamos dessas linhas, pois 'guia' já contém os dados.
+                        // const guia.statusOPME = guia.statusOPME; 
+                        // const guia.statusOrigem = guia.statusOrigem; 
+
                         const guiaCard = criarCardGuia(guia, categoria.chave);
                         categoriaDiv.appendChild(guiaCard);
                     });
@@ -675,93 +290,91 @@
                     guiasContainer.appendChild(categoriaDiv);
                 }
             });
-
-            // Se não houver guias
-            if (guiasContainer.children.length === 0) {
-                guiasContainer.innerHTML = `
-                    <div class="empty-state">
-                        <div style="font-size: 3rem;">📭</div>
-                        <h3>Nenhuma guia encontrada</h3>
-                        <p>Não foram encontradas guias OPME em análise.</p>
-                    </div>
-                `;
-            }
         }
 
-
+        function getStatusClass(status) {
+            switch(status) {
+                case 'Autorizada': 
+                case 'Executada':
+                    return 'status-autorizada';
+                case 'Autorizada Parcialmente': 
+                    return 'status-parcial';
+                case 'Negada': 
+                    return 'status-negada';
+                case 'Em Análise':
+                case 'Documentacao Em Analise':
+                case 'Em Reanalise':
+                    return 'status-analise';
+                default: return 'status-nao-encontrada';
+            }
+        }
+        
         function criarCardGuia(guia, categoria) {
             const card = document.createElement('div');
             card.className = 'guia-card';
             
-            const statusClass = getStatusClass(categoria);
-
-            // Verificar se é uma guia sem origem para mostrar informações diferentes
+            const statusClass = getStatusClass(guia.statusOrigem);
             const isSemOrigem = categoria === 'semGuiaOrigem';
             
-            card.innerHTML = `
+            const headerHTML = `
                 <div class="guia-header">
                     <div class="guia-info">
                         <h3>Guia de OPME - Nº ${guia.guiaOPME}</h3>
                         <div class="guia-detalhes">
                             ${isSemOrigem ? 
-                                `Tipo: ${guia.tipoGuiaOrigem}` : 
-                                `Guia de Origem: ${guia.tipoGuiaOrigem} - Nº ${guia.guiaOrigem}`
+                                `**Tipo:** ${guia.tipoGuiaOrigem} (Status OPME: ${guia.statusOPME})` : 
+                                `**Guia Origem:** ${guia.tipoGuiaOrigem} - Nº ${guia.guiaOrigem} (Status OPME: ${guia.statusOPME})`
                             }
                         </div>
                         ${!isSemOrigem ? `
-                            <div class="guia-status ${statusClass}">
-                                Status Guia de Origem: ${guia.statusOrigem}
+                            <div class="guia-status ${statusClass} mt-2">
+                                Status Guia de Origem: **${guia.statusOrigem}**
                             </div>
                         ` : ''}
+                        <div class="guia-detalhes mt-1">**Beneficiário:** ${guia.beneficiario} - **Prestador:** ${guia.prestador}</div>
                     </div>
                     ${!isSemOrigem && guia.itensOrigem.length > 0 ? '<button class="expand-btn">▼</button>' : ''}
                 </div>
-                ${!isSemOrigem ? `
-                    <div class="itens-container">
-                        ${guia.itensOrigem.length > 0 ? 
-                            '<div style="margin-bottom: 1rem; font-weight: bold;">Itens da Guia Origem:</div>' +
-                            guia.itensOrigem.map(item => `
-                                <div class="item-lista">
-                                    <div class="item-codigo">${item.codigo}</div>
-                                    <div class="item-descricao">${item.descricao}</div>
-                                    <div class="item-quantidades">
-                                        <span class="quant-solicitada">Qtd Solicitada: ${item.quantSolicitada}</span> - 
-                                        <span class="quant-autorizada">Qtd Autorizada: ${item.quantAutorizada}</span>
-                                    </div>
-                                </div>
-                            `).join('') 
-                            : 
-                            '<div class="item-lista">Nenhum item encontrado</div>'
-                        }
-                    </div>
-                ` : ''}
             `;
-
-            // Adicionar evento de clique para expandir apenas se não for sem origem e tiver itens
+            
+            card.innerHTML = headerHTML;
+            
             if (!isSemOrigem && guia.itensOrigem.length > 0) {
+                const itensContainer = document.createElement('div');
+                itensContainer.className = 'itens-container';
+                itensContainer.innerHTML = '<div style="margin-bottom: 1rem; font-weight: bold; padding: 0.5rem 0;">Itens da Guia de Origem:</div>';
+                
+                guia.itensOrigem.forEach(item => {
+                    const isNegado = item.quantAutorizada == 0;
+                    const quantClass = isNegado ? 'quant-nao-autorizada' : 'quant-autorizada';
+                    
+                    itensContainer.innerHTML += `
+                        <div class="item-lista">
+                            <div class="item-codigo">Cód: ${item.codigo}</div>
+                            <div class="item-descricao">${item.descricao}</div>
+                            <div class="item-quantidades">
+                                <span class="quant-solicitada">Solicitada: ${item.quantSolicitada}</span> - 
+                                <span class="${quantClass}">Autorizada: ${item.quantAutorizada}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                card.appendChild(itensContainer);
+
                 const header = card.querySelector('.guia-header');
                 const expandBtn = card.querySelector('.expand-btn');
-                const itensContainer = card.querySelector('.itens-container');
 
-                header.addEventListener('click', () => {
-                    const isExpanded = itensContainer.classList.contains('show');
-                    itensContainer.classList.toggle('show', !isExpanded);
-                    expandBtn.classList.toggle('expanded', !isExpanded);
-                });
+                if (header && expandBtn && itensContainer) {
+                    header.addEventListener('click', () => {
+                        const isExpanded = itensContainer.classList.contains('show');
+                        itensContainer.classList.toggle('show', !isExpanded);
+                        expandBtn.classList.toggle('expanded', !isExpanded);
+                    });
+                }
             }
 
             return card;
-        }
-
-        function getStatusClass(categoria) {
-            switch(categoria) {
-                case 'autorizadas': return 'status-autorizada';
-                case 'parcialmenteAutorizadas': return 'status-parcial';
-                case 'negadas': return 'status-negada';
-                case 'emAnalise': return 'status-analise';
-                case 'semGuiaOrigem': return 'status-analise';
-                default: return 'status-analise';
-            }
         }
     </script>
 </body>
