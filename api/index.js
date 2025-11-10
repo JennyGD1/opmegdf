@@ -6,7 +6,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Configurações
-const GAS_TOKEN_URL = process.env.GAS_TOKEN_URL;
+const GAS_TOKEN_URL = "https://script.google.com/macros/s/AKfycbypQ1Smx0v-2w4brX8FV3D52op3RvKsfzyxoHNq05Fm5AdGDAHaYqvhN7lQ2VY4Ir-H/exec";
 const BASE_URL = "https://df-regulacao-api-live.gdf.live.maida.health";
 const EVENTOS_GUIA_URL = "https://df-eventos-guia-api-live.gdf.live.maida.health";
 
@@ -245,19 +245,27 @@ async function obterToken() {
 async function buscarTodasGuiasOPME(token) {
     let todasGuias = [];
     let page = 0;
-    const size = 100; // Aumentar ainda mais para buscar todas de uma vez
+    const size = 50; // Tamanho razoável para evitar timeouts
+    let totalPages = null;
 
     while (true) {
         const url = `${BASE_URL}/v2/cotacao-opme/em-analise?page=${page}&size=${size}`;
         
         try {
             console.log(`Buscando página ${page}...`);
+            
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+            
             const response = await fetch(url, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
-                }
+                },
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 console.log(`Erro HTTP ${response.status} na página ${page}`);
@@ -284,16 +292,35 @@ async function buscarTodasGuiasOPME(token) {
             todasGuias = todasGuias.concat(data.content);
             console.log(`Página ${page}: ${data.content.length} guias encontradas`);
 
+            // Atualizar totalPages da primeira resposta
+            if (totalPages === null && data.totalPages !== undefined) {
+                totalPages = data.totalPages;
+                console.log(`Total de páginas a serem buscadas: ${totalPages}`);
+            }
+
             // Verificar se é a última página
-            if (data.last === true || page >= (data.totalPages || 10) - 1) {
+            if (data.last === true) {
                 console.log(`Última página alcançada: ${page}`);
+                break;
+            }
+
+            // Verificar baseado no totalPages
+            if (totalPages !== null && page >= totalPages - 1) {
+                console.log(`Todas as ${totalPages} páginas foram buscadas`);
                 break;
             }
 
             page++;
 
+            // Pequeno delay entre páginas para não sobrecarregar
+            await new Promise(resolve => setTimeout(resolve, 500));
+
         } catch (error) {
-            console.error(`Erro ao buscar página ${page}:`, error);
+            if (error.name === 'AbortError') {
+                console.error(`Timeout ao buscar página ${page}`);
+            } else {
+                console.error(`Erro ao buscar página ${page}:`, error.message);
+            }
             break;
         }
     }
