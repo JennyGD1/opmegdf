@@ -226,46 +226,86 @@ async function obterToken() {
 
 // Buscar todas as guias OPME em análise - Versão simplificada
 async function buscarTodasGuiasOPME(token) {
-    try {
-        console.log('Buscando guias OPME...');
-        const url = `${BASE_URL}/v2/cotacao-opme/em-analise?page=0&size=20`;
-        
-        console.log('URL:', url);
-        
-        const response = await fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            // Timeout de 30 segundos
-            signal: AbortSignal.timeout(30000)
-        });
+    let todasGuias = [];
+    let page = 0;
+    const size = 50; // Aumentar para buscar mais itens por página
+    let totalPages = null;
 
-        console.log('Status da resposta:', response.status);
+    try {
+        console.log('Iniciando busca de todas as guias OPME...');
         
-        if (!response.ok) {
-            console.log('Response not OK:', response.status, response.statusText);
-            return [];
+        while (true) {
+            const url = `${BASE_URL}/v2/cotacao-opme/em-analise?page=${page}&size=${size}`;
+            
+            console.log(`Buscando página ${page}...`);
+            
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                signal: AbortSignal.timeout(30000)
+            });
+
+            console.log('Status da resposta:', response.status);
+            
+            if (!response.ok) {
+                console.log('Response not OK:', response.status, response.statusText);
+                break;
+            }
+
+            const data = await response.json();
+            
+            console.log(`Página ${page}:`, {
+                contentLength: data.content?.length,
+                totalElements: data.totalElements,
+                totalPages: data.totalPages,
+                last: data.last
+            });
+
+            if (!data.content || data.content.length === 0) {
+                console.log('Página vazia - fim da paginação');
+                break;
+            }
+
+            todasGuias = todasGuias.concat(data.content);
+            console.log(`Página ${page}: ${data.content.length} guias encontradas`);
+
+            // Atualizar totalPages da primeira resposta
+            if (totalPages === null && data.totalPages !== undefined) {
+                totalPages = data.totalPages;
+                console.log(`Total de páginas a serem buscadas: ${totalPages}`);
+            }
+
+            // Verificar se é a última página
+            if (data.last === true) {
+                console.log('Última página alcançada');
+                break;
+            }
+
+            // Verificar baseado no totalPages
+            if (totalPages !== null && page >= totalPages - 1) {
+                console.log(`Todas as ${totalPages} páginas foram buscadas`);
+                break;
+            }
+
+            page++;
+
+            // Pequeno delay entre páginas para não sobrecarregar
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
 
-        const data = await response.json();
-        console.log('Dados recebidos:', {
-            contentLength: data.content?.length,
-            totalElements: data.totalElements,
-            totalPages: data.totalPages
-        });
-
-        return data.content || [];
+        console.log(`Busca concluída: ${todasGuias.length} guias encontradas em ${page + 1} páginas`);
+        return todasGuias;
         
     } catch (error) {
         console.error('Erro ao buscar guias OPME:', error.message);
         if (error.name === 'TimeoutError') {
             console.error('Timeout na requisição das guias OPME');
         }
-        return [];
+        return todasGuias; // Retorna o que conseguiu buscar até o momento
     }
 }
-
 // Buscar detalhes da guia OPME - Versão simplificada
 async function buscarDetalhesGuiaOPME(idGuia, token) {
     try {
