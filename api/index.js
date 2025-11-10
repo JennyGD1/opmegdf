@@ -307,50 +307,95 @@ async function buscarDetalhesGuiaOPME(idGuia, token) {
     const url = `${BASE_URL}/v2/buscar-guia/detalhamento-guia/${idGuia}/OPME`;
     
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+        
         const response = await fetch(url, {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
-            }
+            },
+            signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             console.log(`Erro ${response.status} ao buscar detalhes da guia OPME ${idGuia}`);
             return null;
         }
-        return await response.json();
+        
+        // Verificar se a resposta é JSON válido
+        const text = await response.text();
+        if (!text) {
+            console.log(`Resposta vazia para guia OPME ${idGuia}`);
+            return null;
+        }
+        
+        try {
+            return JSON.parse(text);
+        } catch (parseError) {
+            console.error(`Erro ao fazer parse JSON da guia OPME ${idGuia}:`, parseError.message);
+            return null;
+        }
     } catch (error) {
-        console.error(`Erro ao buscar detalhes da guia OPME ${idGuia}:`, error.message);
+        if (error.name === 'AbortError') {
+            console.error(`Timeout ao buscar detalhes da guia OPME ${idGuia}`);
+        } else {
+            console.error(`Erro ao buscar detalhes da guia OPME ${idGuia}:`, error.message);
+        }
         return null;
     }
 }
+
 
 // Buscar status da guia de origem
 async function buscarStatusGuiaOrigem(numeroGuia, token) {
     const url = `${EVENTOS_GUIA_URL}/historico/prestador?page=0&size=10&tipoGuia=&statusSolicitacao=&statusRegulacao=&statusFaturamento=&numeroGuiaPrestador=&senha=&numeroGuia=${numeroGuia}&cpfBeneficiario=&codigoOuDescricao=&tipoProcesso=`;
     
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+        
         const response = await fetch(url, {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
-            }
+            },
+            signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             console.log(`Erro ${response.status} ao buscar status da guia ${numeroGuia}`);
             return null;
         }
 
-        const data = await response.json();
-        
-        if (data.content && data.content.length > 0) {
-            return data.content[0].situacaoAtual || "Status não disponível";
+        const text = await response.text();
+        if (!text) {
+            console.log(`Resposta vazia para status da guia ${numeroGuia}`);
+            return null;
         }
         
-        return "Status não encontrado";
+        try {
+            const data = JSON.parse(text);
+            
+            if (data.content && data.content.length > 0) {
+                return data.content[0].situacaoAtual || "Status não disponível";
+            }
+            
+            return "Status não encontrado";
+        } catch (parseError) {
+            console.error(`Erro ao fazer parse JSON do status da guia ${numeroGuia}:`, parseError.message);
+            return null;
+        }
     } catch (error) {
-        console.error(`Erro ao buscar status da guia ${numeroGuia}:`, error.message);
+        if (error.name === 'AbortError') {
+            console.error(`Timeout ao buscar status da guia ${numeroGuia}`);
+        } else {
+            console.error(`Erro ao buscar status da guia ${numeroGuia}:`, error.message);
+        }
         return null;
     }
 }
@@ -360,20 +405,42 @@ async function buscarDetalhesGuiaOrigem(idGuia, token) {
     const url = `${BASE_URL}/v2/buscar-guia/detalhamento-guia/${idGuia}/SOLICITACAO_INTERNACAO`;
     
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+        
         const response = await fetch(url, {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
-            }
+            },
+            signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             console.log(`Erro ${response.status} ao buscar detalhes da guia de origem ${idGuia}`);
             return null;
         }
-        return await response.json();
+        
+        const text = await response.text();
+        if (!text) {
+            console.log(`Resposta vazia para guia de origem ${idGuia}`);
+            return null;
+        }
+        
+        try {
+            return JSON.parse(text);
+        } catch (parseError) {
+            console.error(`Erro ao fazer parse JSON da guia de origem ${idGuia}:`, parseError.message);
+            return null;
+        }
     } catch (error) {
-        console.error(`Erro ao buscar detalhes da guia de origem ${idGuia}:`, error.message);
+        if (error.name === 'AbortError') {
+            console.error(`Timeout ao buscar detalhes da guia de origem ${idGuia}`);
+        } else {
+            console.error(`Erro ao buscar detalhes da guia de origem ${idGuia}:`, error.message);
+        }
         return null;
     }
 }
