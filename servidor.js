@@ -11,6 +11,7 @@ const PORT = 3000;
 const API_BASE_URL = 'https://df-regulacao-api-live.gdf.live.maida.health/v2/buscar-guia/detalhamento-guia/';
 const API_LISTA_BASE = 'https://df-regulacao-api-live.gdf.live.maida.health/v2/cotacao-opme/em-analise'; // API 1 URL
 const GAS_TOKEN_URL = "https://script.google.com/macros/s/AKfycbypQ1Smx0v-2w4brX8FV3D52op3RvKsfzyxoHNq05Fm5AdGDAHaYqvhN7lQ2VY4Ir-H/exec";
+const GAS_TOKEN_URL = process.env.GAS_TOKEN_URL;
 
 // Middlewares
 app.use(cors());
