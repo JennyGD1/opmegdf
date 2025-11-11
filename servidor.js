@@ -4,23 +4,39 @@ const path = require('path');
 const cors = require('cors');
 const fetch = require('node-fetch');
 
+// 1. Configuração do DOTENV para Ambiente Local
+// Carrega as variáveis do .env file apenas no ambiente de desenvolvimento
+if (process.env.NODE_ENV !== 'production') {
+    require('dotenv').config(); 
+}
+
 const app = express();
 const PORT = 3000;
 
 // Configurações de API
 const API_BASE_URL = 'https://df-regulacao-api-live.gdf.live.maida.health/v2/buscar-guia/detalhamento-guia/';
 const API_LISTA_BASE = 'https://df-regulacao-api-live.gdf.live.maida.health/v2/cotacao-opme/em-analise'; // API 1 URL
-const GAS_TOKEN_URL = "https://script.google.com/macros/s/AKfycbypQ1Smx0v-2w4brX8FV3D52op3RvKsfzyxoHNq05Fm5AdGDAHaYqvhN7lQ2VY4Ir-H/exec";
+
+// 2. USO ÚNICO E SEGURO DA VARIÁVEL DE AMBIENTE
+// O valor é obtido de process.env.GAS_TOKEN_URL
 const GAS_TOKEN_URL = process.env.GAS_TOKEN_URL;
+
+// Checagem de segurança, essencial para debug
+if (!GAS_TOKEN_URL) {
+    console.error("ERRO CRÍTICO: Variável de ambiente GAS_TOKEN_URL não definida! O fetch falhará.");
+    // No Vercel, se isso acontecer, a aplicação pode falhar na inicialização
+}
 
 // Middlewares
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+
 // Funções de Utilitário e API
 
 async function obterToken() {
+    // Note que se GAS_TOKEN_URL for undefined, a próxima linha lançará um erro
     try {
         const response = await fetch(GAS_TOKEN_URL);
         const data = await response.json();
@@ -285,5 +301,5 @@ if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
     });
 }
 
-// Para o Vercel:
+// Para o Vercel: Exporta o app para ser tratado como uma Serverless Function
 module.exports = app;
